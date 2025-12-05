@@ -406,19 +406,26 @@ function processSpyVotes(room: Room): void {
     .map(([id]) => id);
 
   const revealedId = topSuspects[Math.floor(Math.random() * topSuspects.length)];
-  room.revealedSpyIds = [revealedId];
+  
+  // Add to revealed spies list instead of replacing
+  if (!room.revealedSpyIds.includes(revealedId)) {
+    room.revealedSpyIds.push(revealedId);
+  }
 
   const revealedPlayer = room.players.find((p) => p.id === revealedId);
   const isSpy = revealedPlayer?.role === "spy";
 
   if (isSpy) {
+    // Award points to players who voted for the spy
     room.players.forEach((p) => {
       if (p.role !== "spy" && room.spyVotes.some((v) => v.voterId === p.id && v.suspectId === revealedId)) {
         p.score += 1;
       }
     });
+    // Move to spy guess phase
     room.phase = "spy_guess";
   } else {
+    // If wrong person was voted, move to results
     room.phase = "results";
   }
 }
@@ -427,13 +434,19 @@ export function submitGuess(playerId: string, guess: string): Room | undefined {
   const room = getRoomByPlayerId(playerId);
   if (!room) return undefined;
   if (room.phase !== "spy_guess") return undefined;
-  if (!room.revealedSpyIds.includes(playerId)) return undefined;
+  
+  const player = room.players.find(p => p.id === playerId);
+  if (!player) return undefined;
+  
+  // Check if player is a revealed spy
+  if (!room.revealedSpyIds.includes(playerId) || player.role !== "spy") return undefined;
 
   room.spyGuess = guess;
   room.phase = "guess_validation";
   room.guessValidationVotes = [];
 
   return room;
+}rn room;
 }
 
 export function validateGuess(playerId: string, isCorrect: boolean): Room | undefined {
