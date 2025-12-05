@@ -253,8 +253,8 @@ function selectCategoryAndStartWordReveal(room: Room): void {
   room.currentPlayerIndex = 0;
   room.spyGuess = undefined;
   room.guessValidationVotes = [];
-  // Initialize turn queue with all players
-  room.turnQueue = room.players.map(p => p.id);
+  // Initialize turn queue with all players in random order
+  room.turnQueue = [...room.players].sort(() => Math.random() - 0.5).map(p => p.id);
   room.currentTurnPlayerId = room.turnQueue[0];
   room.turnTimerEnd = undefined;
 }
@@ -515,9 +515,13 @@ export function startQuestioningPhase(roomId: string): Room | undefined {
   if (room.phase !== "word_reveal") return undefined;
 
   room.phase = "questioning";
-  room.turnQueue = room.players.map(p => p.id);
+  // Use the already randomized turn queue from word reveal phase
+  // If turnQueue is empty (shouldn't happen), create a new randomized one
+  if (room.turnQueue.length === 0) {
+    room.turnQueue = [...room.players].sort(() => Math.random() - 0.5).map(p => p.id);
+  }
   room.currentTurnPlayerId = room.turnQueue[0];
-  room.currentPlayerIndex = 0;
+  room.currentPlayerIndex = room.players.findIndex(p => p.id === room.turnQueue[0]);
   room.turnTimerEnd = Date.now() + 60000; // 1 minute timer for first turn
 
   return room;

@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Search, Users, Moon, Sun, Play, UserPlus, Hash } from "lucide-react";
+import { Search, Users, Moon, Sun, Play, UserPlus, Hash, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -27,17 +27,28 @@ import { useTheme } from "@/lib/theme-provider";
 import { useGame } from "@/lib/game-context";
 import { createRoomSchema, joinRoomSchema, type CreateRoomInput, type JoinRoomInput, type GameMode } from "@shared/schema";
 
+const PLAYER_NAME_KEY = "spy_game_player_name";
+
+interface BeforeInstallPromptEvent extends Event {
+  prompt(): Promise<void>;
+  userChoice: Promise<{ outcome: "accepted" | "dismissed" }>;
+}
+
 export default function Home() {
   const { theme, toggleTheme } = useTheme();
   const { createRoom, joinRoom, isConnected, error, clearError, room } = useGame();
   const [, setLocation] = useLocation();
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showJoinModal, setShowJoinModal] = useState(false);
+  const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null);
+  const [isInstalled, setIsInstalled] = useState(false);
+
+  const savedName = typeof window !== "undefined" ? localStorage.getItem(PLAYER_NAME_KEY) || "" : "";
 
   const createForm = useForm<CreateRoomInput>({
     resolver: zodResolver(createRoomSchema),
     defaultValues: {
-      playerName: "",
+      playerName: savedName,
       gameMode: "classic",
     },
   });
@@ -45,18 +56,52 @@ export default function Home() {
   const joinForm = useForm<JoinRoomInput>({
     resolver: zodResolver(joinRoomSchema),
     defaultValues: {
-      playerName: "",
+      playerName: savedName,
       roomCode: "",
     },
   });
 
   const handleCreateRoom = (data: CreateRoomInput) => {
+    localStorage.setItem(PLAYER_NAME_KEY, data.playerName);
     createRoom(data.playerName, data.gameMode);
   };
 
   const handleJoinRoom = (data: JoinRoomInput) => {
+    localStorage.setItem(PLAYER_NAME_KEY, data.playerName);
     joinRoom(data.playerName, data.roomCode.toUpperCase());
   };
+
+  const handleInstallClick = async () => {
+    if (!installPrompt) return;
+    
+    await installPrompt.prompt();
+    const { outcome } = await installPrompt.userChoice;
+    
+    if (outcome === "accepted") {
+      setIsInstalled(true);
+    }
+    setInstallPrompt(null);
+  };
+
+  useEffect(() => {
+    const checkInstalled = () => {
+      if (window.matchMedia("(display-mode: standalone)").matches) {
+        setIsInstalled(true);
+      }
+    };
+    checkInstalled();
+
+    const handleBeforeInstallPrompt = (e: Event) => {
+      e.preventDefault();
+      setInstallPrompt(e as BeforeInstallPromptEvent);
+    };
+
+    window.addEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
+    
+    return () => {
+      window.removeEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
+    };
+  }, []);
 
   useEffect(() => {
     if (room) {
@@ -75,7 +120,19 @@ export default function Home() {
           <Search className="w-6 h-6 text-primary" />
           <span className="text-lg font-bold text-foreground">من هو الجاسوس؟</span>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          {installPrompt && !isInstalled && (
+            <Button
+              variant="default"
+              size="sm"
+              className="gap-2"
+              onClick={handleInstallClick}
+              data-testid="button-install-app"
+            >
+              <Download className="w-4 h-4" />
+              تحميل التطبيق
+            </Button>
+          )}
           <Button
             variant="outline"
             size="sm"
