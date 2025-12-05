@@ -91,9 +91,6 @@ export default function Home() {
           <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-foreground">
             من هو الجاسوس؟
           </h1>
-          <p className="text-lg md:text-xl text-muted-foreground max-w-md mx-auto">
-            لعبة جماعية ممتعة للأصدقاء والعائلة. اكتشف الجاسوس قبل فوات الأوان!
-          </p>
         </div>
 
         <div className="flex flex-col sm:flex-row gap-4 w-full max-w-md animate-fade-in">
@@ -146,7 +143,7 @@ export default function Home() {
               <div className="w-8 h-8 mx-auto mb-2 bg-primary rounded-full flex items-center justify-center">
                 <span className="text-primary-foreground font-bold text-xs">60</span>
               </div>
-              <p className="text-sm text-muted-foreground">دقيقة لكل دور</p>
+              <p className="text-sm text-muted-foreground">60 ثانية لكل دور</p>
             </CardContent>
           </Card>
           <Card className="text-center">
@@ -298,9 +295,6 @@ export default function Home() {
         </DialogContent>
       </Dialog>
 
-      <footer className="p-4 text-center text-sm text-muted-foreground">
-        <p>لعبة جماعية ممتعة من 4 إلى 10 لاعبين</p>
-      </footer>
     </div>
   );
 }
