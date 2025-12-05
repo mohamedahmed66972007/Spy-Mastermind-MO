@@ -328,6 +328,50 @@ export function endTurn(playerId: string): Room | undefined {
   return room;
 }
 
+// Called when the 60-second asking timer expires without a question being asked
+export function forceEndAskingPhase(roomId: string): Room | undefined {
+  const room = rooms.get(roomId);
+  if (!room) return undefined;
+  if (room.phase !== "questioning") return undefined;
+  if (!room.currentTurnPlayerId) return undefined;
+
+  // Deduct a question from the current player since they didn't ask
+  const currentPlayer = room.players.find(p => p.id === room.currentTurnPlayerId);
+  if (currentPlayer && currentPlayer.questionsRemaining !== undefined && currentPlayer.questionsRemaining > 0) {
+    currentPlayer.questionsRemaining--;
+  }
+
+  // Clear any pending question that wasn't answered
+  const lastQuestion = room.questions[room.questions.length - 1];
+  if (lastQuestion && !lastQuestion.answer) {
+    // Remove the unanswered question or mark it as skipped
+    lastQuestion.answer = "(لم يتم الإجابة)";
+  }
+
+  // Move to next player in turn queue
+  advanceToNextTurn(room);
+
+  return room;
+}
+
+// Called when the 30-second answering timer expires without an answer
+export function forceEndAnsweringPhase(roomId: string): Room | undefined {
+  const room = rooms.get(roomId);
+  if (!room) return undefined;
+  if (room.phase !== "questioning") return undefined;
+
+  // Mark the last question as unanswered
+  const lastQuestion = room.questions[room.questions.length - 1];
+  if (lastQuestion && !lastQuestion.answer) {
+    lastQuestion.answer = "(لم يتم الإجابة)";
+  }
+
+  // Move to next player in turn queue
+  advanceToNextTurn(room);
+
+  return room;
+}
+
 export function markDoneWithQuestions(playerId: string): Room | undefined {
   const room = getRoomByPlayerId(playerId);
   if (!room) return undefined;
@@ -429,7 +473,18 @@ function processSpyVotes(room: Room): void {
     .filter(([_, count]) => count === maxVotes)
     .map(([id]) => id);
 
-  const revealedId = topSuspects[Math.floor(Math.random() * topSuspects.length)];
+  // Prioritize selecting a spy if there's a tie
+  let revealedId: string;
+  const spyInTopSuspects = topSuspects.find(id => {
+    const player = room.players.find(p => p.id === id);
+    return player?.role === "spy";
+  });
+  
+  if (spyInTopSuspects) {
+    revealedId = spyInTopSuspects;
+  } else {
+    revealedId = topSuspects[Math.floor(Math.random() * topSuspects.length)];
+  }
   
   // Add to revealed spies list instead of replacing
   if (!room.revealedSpyIds.includes(revealedId)) {
@@ -440,12 +495,15 @@ function processSpyVotes(room: Room): void {
   const isSpy = revealedPlayer?.role === "spy";
 
   if (isSpy) {
-    // Award points to ALL players who voted for this specific spy
+    // Award points to ALL players who voted for ANY spy (not just the revealed one)
     room.players.forEach((p) => {
-      // Give point if player is not a spy AND voted for the revealed spy
       if (p.role !== "spy") {
-        const votedForThisSpy = room.spyVotes.find((v) => v.voterId === p.id && v.suspectId === revealedId);
-        if (votedForThisSpy) {
+        const votedForAnySpy = room.spyVotes.find((v) => {
+          if (v.voterId !== p.id) return false;
+          const suspect = room.players.find(player => player.id === v.suspectId);
+          return suspect?.role === "spy";
+        });
+        if (votedForAnySpy) {
           p.score = (p.score || 0) + 1;
         }
       }
@@ -453,6 +511,12 @@ function processSpyVotes(room: Room): void {
     // Move to spy guess phase
     room.phase = "spy_guess";
   } else {
+    // Award 1 point to all spies since civilians voted wrong
+    room.players.forEach((p) => {
+      if (p.role === "spy") {
+        p.score = (p.score || 0) + 1;
+      }
+    });
     // If wrong person was voted, move to results
     room.phase = "results";
   }

@@ -26,6 +26,8 @@ import {
   startQuestioningPhase,
   forceSelectCategoryAndStartWordReveal,
   forceProcessSpyVotes,
+  forceEndAskingPhase,
+  forceEndAnsweringPhase,
 } from "./game-storage";
 
 const clients = new Map<string, WebSocket>();
@@ -124,23 +126,21 @@ function startAnswerTimer(roomId: string): void {
   const timer = setTimeout(() => {
     const currentRoom = getRoom(roomId);
     if (currentRoom && currentRoom.phase === "questioning") {
-      // Time expired for answering, advance to next turn
-      if (currentRoom.currentTurnPlayerId) {
-        const updatedRoom = endTurn(currentRoom.currentTurnPlayerId);
-        if (updatedRoom) {
-          if (updatedRoom.phase === "spy_voting") {
-            broadcastToRoom(roomId, {
-              type: "phase_changed",
-              data: { phase: "spy_voting", room: updatedRoom },
-            });
-            startSpyVotingTimer(roomId);
-          } else {
-            broadcastToRoom(roomId, {
-              type: "turn_changed",
-              data: { currentPlayerId: updatedRoom.currentTurnPlayerId || "", room: updatedRoom },
-            });
-            startTurnTimer(roomId, true);
-          }
+      // Time expired for answering, use forceEndAnsweringPhase to properly advance turn
+      const updatedRoom = forceEndAnsweringPhase(roomId);
+      if (updatedRoom) {
+        if (updatedRoom.phase === "spy_voting") {
+          broadcastToRoom(roomId, {
+            type: "phase_changed",
+            data: { phase: "spy_voting", room: updatedRoom },
+          });
+          startSpyVotingTimer(roomId);
+        } else {
+          broadcastToRoom(roomId, {
+            type: "turn_changed",
+            data: { currentPlayerId: updatedRoom.currentTurnPlayerId || "", room: updatedRoom },
+          });
+          startTurnTimer(roomId, true);
         }
       }
     }
@@ -175,7 +175,8 @@ function startTurnTimer(roomId: string, forceReset: boolean = true): void {
   const timer = setTimeout(() => {
     const currentRoom = getRoom(roomId);
     if (currentRoom && currentRoom.phase === "questioning" && currentRoom.currentTurnPlayerId) {
-      const updatedRoom = endTurn(currentRoom.currentTurnPlayerId);
+      // Use forceEndAskingPhase which deducts a question from the player
+      const updatedRoom = forceEndAskingPhase(roomId);
       if (updatedRoom) {
         if (updatedRoom.phase === "spy_voting") {
           broadcastToRoom(roomId, {
@@ -266,7 +267,109 @@ function forceEndSpyVoting(roomId: string): void {
       type: "phase_changed",
       data: { phase: room.phase, room },
     });
+    // Start spy guess timer if we're in spy_guess phase
+    if (room.phase === "spy_guess") {
+      startSpyGuessTimer(roomId);
+    }
   }
+}
+
+const spyGuessTimers = new Map<string, NodeJS.Timeout>();
+
+function clearSpyGuessTimer(roomId: string): void {
+  const timer = spyGuessTimers.get(roomId);
+  if (timer) {
+    clearTimeout(timer);
+    spyGuessTimers.delete(roomId);
+  }
+}
+
+function startSpyGuessTimer(roomId: string): void {
+  clearSpyGuessTimer(roomId);
+  
+  const room = getRoom(roomId);
+  if (!room || room.phase !== "spy_guess") return;
+  
+  const SPY_GUESS_DURATION = 30000; // 30 seconds for spy to guess
+  
+  broadcastToRoom(roomId, {
+    type: "timer_update",
+    data: { timeRemaining: Math.ceil(SPY_GUESS_DURATION / 1000) },
+  });
+  
+  const timer = setTimeout(() => {
+    const currentRoom = getRoom(roomId);
+    if (currentRoom && currentRoom.phase === "spy_guess") {
+      // Time expired, spy didn't guess - move to results
+      currentRoom.phase = "results";
+      broadcastToRoom(roomId, {
+        type: "phase_changed",
+        data: { phase: "results", room: currentRoom },
+      });
+    }
+    spyGuessTimers.delete(roomId);
+  }, SPY_GUESS_DURATION);
+  
+  spyGuessTimers.set(roomId, timer);
+}
+
+const guessValidationTimers = new Map<string, NodeJS.Timeout>();
+
+function clearGuessValidationTimer(roomId: string): void {
+  const timer = guessValidationTimers.get(roomId);
+  if (timer) {
+    clearTimeout(timer);
+    guessValidationTimers.delete(roomId);
+  }
+}
+
+function startGuessValidationTimer(roomId: string): void {
+  clearGuessValidationTimer(roomId);
+  
+  const room = getRoom(roomId);
+  if (!room || room.phase !== "guess_validation") return;
+  
+  const VALIDATION_DURATION = 30000; // 30 seconds to validate
+  
+  broadcastToRoom(roomId, {
+    type: "timer_update",
+    data: { timeRemaining: Math.ceil(VALIDATION_DURATION / 1000) },
+  });
+  
+  const timer = setTimeout(() => {
+    const currentRoom = getRoom(roomId);
+    if (currentRoom && currentRoom.phase === "guess_validation") {
+      // Time expired, force process validation votes
+      forceProcessGuessValidation(roomId);
+    }
+    guessValidationTimers.delete(roomId);
+  }, VALIDATION_DURATION);
+  
+  guessValidationTimers.set(roomId, timer);
+}
+
+function forceProcessGuessValidation(roomId: string): void {
+  const room = getRoom(roomId);
+  if (!room || room.phase !== "guess_validation") return;
+  
+  // Count votes - if more "correct" votes or tie, spy wins the point
+  const correctVotes = room.guessValidationVotes.filter(v => v.isCorrect).length;
+  const incorrectVotes = room.guessValidationVotes.filter(v => !v.isCorrect).length;
+  
+  if (correctVotes >= incorrectVotes && room.guessValidationVotes.length > 0) {
+    // Spy guessed correctly - award point
+    room.players.forEach(p => {
+      if (room.revealedSpyIds.includes(p.id)) {
+        p.score = (p.score || 0) + 1;
+      }
+    });
+  }
+  
+  room.phase = "results";
+  broadcastToRoom(roomId, {
+    type: "phase_changed",
+    data: { phase: "results", room },
+  });
 }
 
 function handleMessage(ws: WebSocket, data: string): void {
@@ -537,6 +640,10 @@ function handleMessage(ws: WebSocket, data: string): void {
             type: "phase_changed",
             data: { phase: room.phase, room },
           });
+          // Start spy guess timer if we're in spy_guess phase
+          if (room.phase === "spy_guess") {
+            startSpyGuessTimer(room.id);
+          }
         }
       }
       break;
@@ -547,6 +654,8 @@ function handleMessage(ws: WebSocket, data: string): void {
       const prevPhase = getRoomByPlayerId(playerId)?.phase;
       const room = submitGuess(playerId, message.data.guess);
       if (room) {
+        // Clear the spy guess timer since the spy submitted their guess
+        clearSpyGuessTimer(room.id);
         broadcastToRoom(room.id, {
           type: "room_updated",
           data: { room },
@@ -556,6 +665,8 @@ function handleMessage(ws: WebSocket, data: string): void {
             type: "phase_changed",
             data: { phase: "guess_validation", room },
           });
+          // Start guess validation timer
+          startGuessValidationTimer(room.id);
         }
       }
       break;
@@ -571,6 +682,7 @@ function handleMessage(ws: WebSocket, data: string): void {
           data: { room },
         });
         if (prevPhase === "guess_validation" && room.phase === "results") {
+          clearGuessValidationTimer(room.id);
           broadcastToRoom(room.id, {
             type: "phase_changed",
             data: { phase: "results", room },
