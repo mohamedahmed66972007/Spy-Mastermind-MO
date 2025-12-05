@@ -124,31 +124,27 @@ export function QuestioningPhase() {
     }
   };
 
+  // Determine the current phase state for timer display
+  const lastQ = room.questions[room.questions.length - 1];
+  const isWaitingForAnswer = lastQ && !lastQ.answer;
+  const targetPlayerForAnswer = isWaitingForAnswer ? room.players.find(p => p.id === lastQ.targetId) : null;
+  const askerPlayer = isWaitingForAnswer ? room.players.find(p => p.id === lastQ.askerId) : null;
+  
+  // Timer max based on phase (60s for asking, 30s for answering)
+  const timerMax = isWaitingForAnswer ? 30 : 60;
+
   return (
     <div className="space-y-6">
       <div className="text-center space-y-2">
-        <h1 className="text-2xl md:text-3xl font-bold text-foreground">
-          جولة الأسئلة
-        </h1>
-        <div className="flex items-center justify-center gap-4 flex-wrap">
-          <Badge
-            variant={isMyTurn ? "default" : "secondary"}
-            className="gap-1 text-base px-4 py-1"
-          >
-            <User className="w-4 h-4" />
-            دور: {currentTurnPlayer?.name}
-          </Badge>
-          <Badge variant="outline" className="gap-1">
-            <MessageCircle className="w-4 h-4" />
-            {myQuestionsRemaining} أسئلة متبقية لك
-          </Badge>
-          {amDoneWithQuestions && (
-            <Badge variant="secondary" className="gap-1 bg-green-100 text-green-800">
-              <CheckCircle className="w-4 h-4" />
-              أنهيت أسئلتك
-            </Badge>
+        {/* Turn status display */}
+        <h2 className="text-xl md:text-2xl font-bold text-foreground">
+          {isWaitingForAnswer ? (
+            <>دور <span className="text-accent">{targetPlayerForAnswer?.name}</span> يجاوب على <span className="text-primary">{askerPlayer?.name}</span></>
+          ) : (
+            <>دور <span className="text-primary">{currentTurnPlayer?.name}</span> يسأل</>
           )}
-        </div>
+        </h2>
+        
         {/* Timer display */}
         {localTimer > 0 && (
           <div className="mt-4">
@@ -158,7 +154,7 @@ export function QuestioningPhase() {
                 {Math.floor(localTimer / 60)}:{(localTimer % 60).toString().padStart(2, '0')}
               </span>
             </div>
-            <Progress value={(localTimer / 60) * 100} className="h-2 w-48 mx-auto" />
+            <Progress value={(localTimer / timerMax) * 100} className="h-2 w-48 mx-auto" />
           </div>
         )}
       </div>

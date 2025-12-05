@@ -24,6 +24,8 @@ import {
   reconnectPlayer,
   markPlayerDisconnected,
   startQuestioningPhase,
+  forceSelectCategoryAndStartWordReveal,
+  forceProcessSpyVotes,
 } from "./game-storage";
 
 const clients = new Map<string, WebSocket>();
@@ -78,6 +80,8 @@ function startWordRevealTimer(roomId: string): void {
 }
 
 const turnTimers = new Map<string, NodeJS.Timeout>();
+const answerTimers = new Map<string, NodeJS.Timeout>();
+const votingTimers = new Map<string, NodeJS.Timeout>();
 
 function clearTurnTimer(roomId: string): void {
   const timer = turnTimers.get(roomId);
@@ -87,13 +91,73 @@ function clearTurnTimer(roomId: string): void {
   }
 }
 
-function startTurnTimer(roomId: string, forceReset: boolean = true): void {
+function clearAnswerTimer(roomId: string): void {
+  const timer = answerTimers.get(roomId);
+  if (timer) {
+    clearTimeout(timer);
+    answerTimers.delete(roomId);
+  }
+}
+
+function clearVotingTimer(roomId: string): void {
+  const timer = votingTimers.get(roomId);
+  if (timer) {
+    clearTimeout(timer);
+    votingTimers.delete(roomId);
+  }
+}
+
+function startAnswerTimer(roomId: string): void {
+  clearAnswerTimer(roomId);
   clearTurnTimer(roomId);
   
   const room = getRoom(roomId);
   if (!room || room.phase !== "questioning") return;
   
-  const TURN_DURATION = 60000;
+  const ANSWER_DURATION = 30000; // 30 seconds
+  
+  broadcastToRoom(roomId, {
+    type: "timer_update",
+    data: { timeRemaining: Math.ceil(ANSWER_DURATION / 1000) },
+  });
+  
+  const timer = setTimeout(() => {
+    const currentRoom = getRoom(roomId);
+    if (currentRoom && currentRoom.phase === "questioning") {
+      // Time expired for answering, advance to next turn
+      if (currentRoom.currentTurnPlayerId) {
+        const updatedRoom = endTurn(currentRoom.currentTurnPlayerId);
+        if (updatedRoom) {
+          if (updatedRoom.phase === "spy_voting") {
+            broadcastToRoom(roomId, {
+              type: "phase_changed",
+              data: { phase: "spy_voting", room: updatedRoom },
+            });
+            startSpyVotingTimer(roomId);
+          } else {
+            broadcastToRoom(roomId, {
+              type: "turn_changed",
+              data: { currentPlayerId: updatedRoom.currentTurnPlayerId || "", room: updatedRoom },
+            });
+            startTurnTimer(roomId, true);
+          }
+        }
+      }
+    }
+    answerTimers.delete(roomId);
+  }, ANSWER_DURATION);
+  
+  answerTimers.set(roomId, timer);
+}
+
+function startTurnTimer(roomId: string, forceReset: boolean = true): void {
+  clearTurnTimer(roomId);
+  clearAnswerTimer(roomId);
+  
+  const room = getRoom(roomId);
+  if (!room || room.phase !== "questioning") return;
+  
+  const TURN_DURATION = 60000; // 60 seconds for asking
   let timeRemaining: number;
   
   if (forceReset || !room.turnTimerEnd || room.turnTimerEnd <= Date.now()) {
@@ -118,6 +182,7 @@ function startTurnTimer(roomId: string, forceReset: boolean = true): void {
             type: "phase_changed",
             data: { phase: "spy_voting", room: updatedRoom },
           });
+          startSpyVotingTimer(roomId);
         } else {
           broadcastToRoom(roomId, {
             type: "turn_changed",
@@ -131,6 +196,77 @@ function startTurnTimer(roomId: string, forceReset: boolean = true): void {
   }, timeRemaining);
   
   turnTimers.set(roomId, timer);
+}
+
+function startCategoryVotingTimer(roomId: string): void {
+  clearVotingTimer(roomId);
+  
+  const room = getRoom(roomId);
+  if (!room || room.phase !== "category_voting") return;
+  
+  const CATEGORY_VOTING_DURATION = 30000; // 30 seconds
+  
+  broadcastToRoom(roomId, {
+    type: "timer_update",
+    data: { timeRemaining: Math.ceil(CATEGORY_VOTING_DURATION / 1000) },
+  });
+  
+  const timer = setTimeout(() => {
+    const currentRoom = getRoom(roomId);
+    if (currentRoom && currentRoom.phase === "category_voting") {
+      // Force move to word reveal phase even if not all voted
+      forceEndCategoryVoting(roomId);
+    }
+    votingTimers.delete(roomId);
+  }, CATEGORY_VOTING_DURATION);
+  
+  votingTimers.set(roomId, timer);
+}
+
+function startSpyVotingTimer(roomId: string): void {
+  clearVotingTimer(roomId);
+  
+  const room = getRoom(roomId);
+  if (!room || room.phase !== "spy_voting") return;
+  
+  const SPY_VOTING_DURATION = 60000; // 60 seconds
+  
+  broadcastToRoom(roomId, {
+    type: "timer_update",
+    data: { timeRemaining: Math.ceil(SPY_VOTING_DURATION / 1000) },
+  });
+  
+  const timer = setTimeout(() => {
+    const currentRoom = getRoom(roomId);
+    if (currentRoom && currentRoom.phase === "spy_voting") {
+      // Force move to next phase even if not all voted
+      forceEndSpyVoting(roomId);
+    }
+    votingTimers.delete(roomId);
+  }, SPY_VOTING_DURATION);
+  
+  votingTimers.set(roomId, timer);
+}
+
+function forceEndCategoryVoting(roomId: string): void {
+  const room = forceSelectCategoryAndStartWordReveal(roomId);
+  if (room) {
+    broadcastToRoom(roomId, {
+      type: "phase_changed",
+      data: { phase: "word_reveal", room },
+    });
+    startWordRevealTimer(roomId);
+  }
+}
+
+function forceEndSpyVoting(roomId: string): void {
+  const room = forceProcessSpyVotes(roomId);
+  if (room) {
+    broadcastToRoom(roomId, {
+      type: "phase_changed",
+      data: { phase: room.phase, room },
+    });
+  }
 }
 
 function handleMessage(ws: WebSocket, data: string): void {
@@ -245,6 +381,8 @@ function handleMessage(ws: WebSocket, data: string): void {
           type: "phase_changed",
           data: { phase: "category_voting", room },
         });
+        // Start category voting timer
+        startCategoryVotingTimer(room.id);
       } else {
         sendToPlayer(playerId, {
           type: "error",
@@ -264,6 +402,7 @@ function handleMessage(ws: WebSocket, data: string): void {
           data: { room },
         });
         if (prevPhase === "category_voting" && room.phase === "word_reveal") {
+          clearVotingTimer(room.id);
           broadcastToRoom(room.id, {
             type: "phase_changed",
             data: { phase: "word_reveal", room },
@@ -315,6 +454,8 @@ function handleMessage(ws: WebSocket, data: string): void {
           type: "room_updated",
           data: { room },
         });
+        // Start answer timer (30 seconds)
+        startAnswerTimer(room.id);
       }
       break;
     }
@@ -324,6 +465,9 @@ function handleMessage(ws: WebSocket, data: string): void {
       const result = answerQuestion(playerId, message.data.answer);
       if (result) {
         const { room, turnAdvanced } = result;
+        // Clear answer timer since answer was given
+        clearAnswerTimer(room.id);
+        
         broadcastToRoom(room.id, {
           type: "room_updated",
           data: { room },
@@ -337,8 +481,9 @@ function handleMessage(ws: WebSocket, data: string): void {
               type: "phase_changed",
               data: { phase: "spy_voting", room },
             });
+            startSpyVotingTimer(room.id);
           } else if (room.phase === "questioning" && room.currentTurnPlayerId) {
-            // Turn changed, restart timer for next player
+            // Turn changed, restart timer for next player (60 seconds for asking)
             startTurnTimer(room.id, true);
             broadcastToRoom(room.id, {
               type: "turn_changed",
@@ -387,6 +532,7 @@ function handleMessage(ws: WebSocket, data: string): void {
           data: { room },
         });
         if (prevPhase === "spy_voting" && room.phase !== "spy_voting") {
+          clearVotingTimer(room.id);
           broadcastToRoom(room.id, {
             type: "phase_changed",
             data: { phase: room.phase, room },
@@ -442,6 +588,8 @@ function handleMessage(ws: WebSocket, data: string): void {
           type: "phase_changed",
           data: { phase: "category_voting", room },
         });
+        // Start category voting timer for new round
+        startCategoryVotingTimer(room.id);
       }
       break;
     }

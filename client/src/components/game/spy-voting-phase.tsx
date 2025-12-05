@@ -1,16 +1,56 @@
-import { useState } from "react";
-import { Vote, Check, User } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
+import { Vote, Check, User, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Progress } from "@/components/ui/progress";
 import { useGame } from "@/lib/game-context";
-import { playVoteSound, resumeAudioContext } from "@/lib/sounds";
+import { playVoteSound, resumeAudioContext, playTimerWarningSound } from "@/lib/sounds";
 
 export function SpyVotingPhase() {
-  const { room, currentPlayer, playerId, voteSpy } = useGame();
+  const { room, currentPlayer, playerId, voteSpy, timerRemaining } = useGame();
   const [selectedSuspect, setSelectedSuspect] = useState<string | null>(null);
+  const [localTimer, setLocalTimer] = useState(timerRemaining || 60);
+  const playedWarning = useRef(false);
+  const timerIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Sync with server timer
+  useEffect(() => {
+    if (timerRemaining > 0) {
+      setLocalTimer(timerRemaining);
+      if (timerRemaining > 10) {
+        playedWarning.current = false;
+      }
+    }
+  }, [timerRemaining]);
+
+  // Local countdown
+  useEffect(() => {
+    if (timerIntervalRef.current) {
+      clearInterval(timerIntervalRef.current);
+    }
+
+    if (room?.phase !== "spy_voting") return;
+
+    timerIntervalRef.current = setInterval(() => {
+      setLocalTimer((prev) => {
+        if (prev <= 0) return 0;
+        const newVal = prev - 1;
+        if (newVal === 10 && !playedWarning.current) {
+          playTimerWarningSound();
+          playedWarning.current = true;
+        }
+        return newVal;
+      });
+    }, 1000);
+
+    return () => {
+      if (timerIntervalRef.current) {
+        clearInterval(timerIntervalRef.current);
+      }
+    };
+  }, [room?.phase]);
 
   if (!room || !currentPlayer) return null;
 
@@ -43,6 +83,19 @@ export function SpyVotingPhase() {
         <Badge variant="outline" className="mt-2">
           {totalVotes}/{totalPlayers} صوتوا
         </Badge>
+        
+        {/* Timer display */}
+        {localTimer > 0 && !hasVoted && (
+          <div className="mt-4">
+            <div className="flex items-center justify-center gap-2 mb-2">
+              <Clock className="w-5 h-5 text-spy" />
+              <span className="text-xl font-bold tabular-nums">
+                {Math.floor(localTimer / 60)}:{(localTimer % 60).toString().padStart(2, '0')}
+              </span>
+            </div>
+            <Progress value={(localTimer / 60) * 100} className="h-2 w-48 mx-auto" />
+          </div>
+        )}
       </div>
 
       <Card>

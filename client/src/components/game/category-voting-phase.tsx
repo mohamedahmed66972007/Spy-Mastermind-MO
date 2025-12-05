@@ -1,9 +1,11 @@
-import { Globe, Apple, Dog, Car, Check } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
+import { Globe, Apple, Dog, Car, Check, Clock } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { useGame } from "@/lib/game-context";
 import { categories } from "@shared/schema";
+import { playTimerWarningSound } from "@/lib/sounds";
 
 const categoryIcons: Record<string, typeof Globe> = {
   globe: Globe,
@@ -13,7 +15,47 @@ const categoryIcons: Record<string, typeof Globe> = {
 };
 
 export function CategoryVotingPhase() {
-  const { room, currentPlayer, voteCategory } = useGame();
+  const { room, currentPlayer, voteCategory, timerRemaining } = useGame();
+  const [localTimer, setLocalTimer] = useState(timerRemaining || 30);
+  const playedWarning = useRef(false);
+  const timerIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Sync with server timer
+  useEffect(() => {
+    if (timerRemaining > 0) {
+      setLocalTimer(timerRemaining);
+      if (timerRemaining > 10) {
+        playedWarning.current = false;
+      }
+    }
+  }, [timerRemaining]);
+
+  // Local countdown
+  useEffect(() => {
+    if (timerIntervalRef.current) {
+      clearInterval(timerIntervalRef.current);
+    }
+
+    if (room?.phase !== "category_voting") return;
+
+    timerIntervalRef.current = setInterval(() => {
+      setLocalTimer((prev) => {
+        if (prev <= 0) return 0;
+        const newVal = prev - 1;
+        if (newVal === 10 && !playedWarning.current) {
+          playTimerWarningSound();
+          playedWarning.current = true;
+        }
+        return newVal;
+      });
+    }, 1000);
+
+    return () => {
+      if (timerIntervalRef.current) {
+        clearInterval(timerIntervalRef.current);
+      }
+    };
+  }, [room?.phase]);
 
   if (!room || !currentPlayer) return null;
 
@@ -40,6 +82,19 @@ export function CategoryVotingPhase() {
         <Badge variant="outline" className="mt-2">
           {totalVotes}/{totalPlayers} صوتوا
         </Badge>
+        
+        {/* Timer display */}
+        {localTimer > 0 && (
+          <div className="mt-4">
+            <div className="flex items-center justify-center gap-2 mb-2">
+              <Clock className="w-5 h-5 text-primary" />
+              <span className="text-xl font-bold tabular-nums">
+                {Math.floor(localTimer / 60)}:{(localTimer % 60).toString().padStart(2, '0')}
+              </span>
+            </div>
+            <Progress value={(localTimer / 30) * 100} className="h-2 w-48 mx-auto" />
+          </div>
+        )}
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

@@ -206,6 +206,15 @@ export function voteCategory(playerId: string, category: string): Room | undefin
   return room;
 }
 
+export function forceSelectCategoryAndStartWordReveal(roomId: string): Room | undefined {
+  const room = rooms.get(roomId);
+  if (!room) return undefined;
+  if (room.phase !== "category_voting") return undefined;
+  
+  selectCategoryAndStartWordReveal(room);
+  return room;
+}
+
 function selectCategoryAndStartWordReveal(room: Room): void {
   const voteCounts = categories.reduce((acc, cat) => {
     acc[cat.id] = room.categoryVotes.filter((v) => v.category === cat.id).length;
@@ -391,6 +400,21 @@ export function voteSpy(playerId: string, suspectId: string): Room | undefined {
     processSpyVotes(room);
   }
 
+  return room;
+}
+
+export function forceProcessSpyVotes(roomId: string): Room | undefined {
+  const room = rooms.get(roomId);
+  if (!room) return undefined;
+  if (room.phase !== "spy_voting") return undefined;
+  
+  // If no one voted, skip to results
+  if (room.spyVotes.length === 0) {
+    room.phase = "results";
+    return room;
+  }
+  
+  processSpyVotes(room);
   return room;
 }
 

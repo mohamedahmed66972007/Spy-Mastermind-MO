@@ -1,4 +1,4 @@
-import { Search, Moon, Sun, Copy, Check, LogOut, Users, Eye, EyeOff } from "lucide-react";
+import { Search, Moon, Sun, Copy, Check, LogOut, Users, Eye, EyeOff, Info, MessageCircle, CheckCircle } from "lucide-react";
 import { useState } from "react";
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
@@ -88,15 +88,55 @@ export function GameHeader() {
                 <span className="tracking-wider">{room.id}</span>
               </Button>
 
-              <Badge variant="secondary" className="gap-1">
-                <Users className="w-3 h-3" />
-                {room.players.length}
-              </Badge>
-
-              {room.phase !== "lobby" && (
-                <Badge variant="outline">
-                  {phaseNames[room.phase] || room.phase}
-                </Badge>
+              {room.phase === "questioning" && (
+                <Dialog>
+                  <DialogTrigger asChild>
+                    <Button
+                      size="icon"
+                      variant="outline"
+                      data-testid="button-players-info"
+                    >
+                      <Info className="w-4 h-4" />
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="max-w-sm">
+                    <DialogHeader>
+                      <DialogTitle className="text-center">حالة أسئلة اللاعبين</DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-3 py-4">
+                      {room.players.map((player) => {
+                        const questionsLeft = player.questionsRemaining ?? 3;
+                        const isDone = player.doneWithQuestions || questionsLeft === 0;
+                        return (
+                          <div
+                            key={player.id}
+                            className="flex items-center justify-between p-3 rounded-lg bg-muted/50"
+                          >
+                            <div className="flex items-center gap-2">
+                              <span className="font-medium">{player.name}</span>
+                              {player.id === playerId && (
+                                <Badge variant="outline" className="text-xs">أنت</Badge>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-2">
+                              {isDone ? (
+                                <Badge variant="secondary" className="gap-1 bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
+                                  <CheckCircle className="w-3 h-3" />
+                                  انتهى
+                                </Badge>
+                              ) : (
+                                <Badge variant="outline" className="gap-1">
+                                  <MessageCircle className="w-3 h-3" />
+                                  {questionsLeft} متبقي
+                                </Badge>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </DialogContent>
+                </Dialog>
               )}
             </>
           )}
