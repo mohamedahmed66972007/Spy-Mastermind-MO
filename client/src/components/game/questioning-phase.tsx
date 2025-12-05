@@ -20,7 +20,19 @@ export function QuestioningPhase() {
   const prevTurnPlayerId = useRef(room?.currentTurnPlayerId);
   const playedWarning = useRef(false);
   const lastAnsweredQuestionIndex = useRef(-1);
+  const timerIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const currentPhase = room?.phase;
+  const currentTurnId = room?.currentTurnPlayerId;
 
+  // Clear timer interval helper
+  const clearTimerInterval = () => {
+    if (timerIntervalRef.current) {
+      clearInterval(timerIntervalRef.current);
+      timerIntervalRef.current = null;
+    }
+  };
+
+  // Reset local timer when server sends timer update
   useEffect(() => {
     setLocalTimer(timerRemaining);
     if (timerRemaining > 10) {
@@ -28,11 +40,33 @@ export function QuestioningPhase() {
     }
   }, [timerRemaining]);
 
+  // Reset local timer and play sound when turn changes
   useEffect(() => {
-    if (localTimer <= 0) return;
-    const interval = setInterval(() => {
+    if (currentTurnId && currentTurnId !== prevTurnPlayerId.current) {
+      // Turn changed - reset timer to 60 seconds
+      setLocalTimer(60);
+      playedWarning.current = false;
+      
+      if (currentTurnId === playerId) {
+        playTurnSound();
+      }
+      prevTurnPlayerId.current = currentTurnId;
+    }
+  }, [currentTurnId, playerId]);
+
+  // Single interval for countdown - only recreated on phase/turn changes, not every tick
+  useEffect(() => {
+    clearTimerInterval();
+    
+    // Only run timer during questioning phase
+    if (currentPhase !== "questioning") {
+      return;
+    }
+    
+    timerIntervalRef.current = setInterval(() => {
       setLocalTimer((prev) => {
-        const newVal = Math.max(0, prev - 1);
+        if (prev <= 0) return 0;
+        const newVal = prev - 1;
         if (newVal === 10 && !playedWarning.current) {
           playTimerWarningSound();
           playedWarning.current = true;
@@ -40,8 +74,9 @@ export function QuestioningPhase() {
         return newVal;
       });
     }, 1000);
-    return () => clearInterval(interval);
-  }, [localTimer]);
+    
+    return clearTimerInterval;
+  }, [currentPhase, currentTurnId]);
 
   useEffect(() => {
     if (!room?.questions) return;
@@ -58,16 +93,6 @@ export function QuestioningPhase() {
       lastAnsweredQuestionIndex.current = lastQIndex;
     }
   }, [room?.questions]);
-
-  useEffect(() => {
-    if (room?.currentTurnPlayerId && room.currentTurnPlayerId !== prevTurnPlayerId.current) {
-      if (room.currentTurnPlayerId === playerId) {
-        playTurnSound();
-      }
-      prevTurnPlayerId.current = room.currentTurnPlayerId;
-      playedWarning.current = false;
-    }
-  }, [room?.currentTurnPlayerId, playerId]);
 
   if (!room || !currentPlayer) return null;
 

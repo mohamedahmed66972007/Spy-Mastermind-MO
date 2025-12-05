@@ -1,4 +1,4 @@
-import { Search, Moon, Sun, Copy, Check, LogOut, Users } from "lucide-react";
+import { Search, Moon, Sun, Copy, Check, LogOut, Users, Eye, EyeOff } from "lucide-react";
 import { useState } from "react";
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
@@ -14,14 +14,27 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { useTheme } from "@/lib/theme-provider";
 import { useGame } from "@/lib/game-context";
 
 export function GameHeader() {
   const { theme, toggleTheme } = useTheme();
-  const { room, leaveRoom, timerRemaining } = useGame();
+  const { room, leaveRoom, currentPlayer, playerId } = useGame();
   const [, setLocation] = useLocation();
   const [copied, setCopied] = useState(false);
+  const [showWord, setShowWord] = useState(false);
+
+  // Get player's word info
+  const isSpy = currentPlayer?.role === "spy";
+  const playerWord = currentPlayer?.word;
+  const canShowWord = room && ["questioning", "spy_voting"].includes(room.phase) && playerWord;
 
   const copyRoomCode = async () => {
     if (room) {
@@ -90,19 +103,38 @@ export function GameHeader() {
         </div>
 
         <div className="flex items-center gap-2">
-          {timerRemaining > 0 && room?.phase !== "lobby" && (
-            <div
-              className={`flex items-center justify-center min-w-[60px] h-9 px-3 rounded-lg font-bold text-lg ${
-                timerRemaining <= 10
-                  ? "bg-destructive text-destructive-foreground animate-timer-pulse"
-                  : timerRemaining <= 30
-                  ? "bg-warning text-warning-foreground"
-                  : "bg-primary text-primary-foreground"
-              }`}
-              data-testid="text-timer"
-            >
-              {timerRemaining}
-            </div>
+          {canShowWord && (
+            <Dialog open={showWord} onOpenChange={setShowWord}>
+              <DialogTrigger asChild>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="gap-2"
+                  data-testid="button-show-word"
+                >
+                  <Eye className="w-4 h-4" />
+                  <span className="hidden sm:inline">إظهار الكلمة</span>
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-sm">
+                <DialogHeader>
+                  <DialogTitle className="text-center">كلمتك</DialogTitle>
+                </DialogHeader>
+                <div className="text-center py-6">
+                  {isSpy && room?.gameMode === "classic" ? (
+                    <div className="space-y-2">
+                      <Search className="w-12 h-12 mx-auto text-spy" />
+                      <p className="text-2xl font-bold text-spy">أنت الجاسوس!</p>
+                      <p className="text-muted-foreground text-sm">
+                        حاول اكتشاف الكلمة من أسئلة اللاعبين
+                      </p>
+                    </div>
+                  ) : (
+                    <p className="text-3xl font-bold text-foreground">{playerWord}</p>
+                  )}
+                </div>
+              </DialogContent>
+            </Dialog>
           )}
 
           <Button

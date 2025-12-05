@@ -30,7 +30,11 @@ export function ResultsPhase() {
 
   const sortedPlayers = [...room.players].sort((a, b) => b.score - a.score);
 
-  const spies = room.players.filter((p) => room.revealedSpyIds.includes(p.id));
+  // Show all spies (by role), not just revealed ones
+  const allSpies = room.players.filter((p) => p.role === "spy");
+  // Show which spies were caught (voted for)
+  const revealedSpies = room.players.filter((p) => room.revealedSpyIds.includes(p.id));
+  const spyCaught = revealedSpies.length > 0 && revealedSpies.some(p => p.role === "spy");
 
   return (
     <div className="space-y-6">
@@ -55,10 +59,14 @@ export function ResultsPhase() {
         </CardHeader>
         <CardContent>
           <div className="flex flex-wrap gap-3">
-            {spies.map((spy) => (
+            {allSpies.map((spy) => (
               <div
                 key={spy.id}
-                className="flex items-center gap-2 p-2 bg-spy/10 rounded-lg border border-spy/20"
+                className={`flex items-center gap-2 p-2 rounded-lg border ${
+                  room.revealedSpyIds.includes(spy.id)
+                    ? "bg-spy/20 border-spy/40"
+                    : "bg-spy/10 border-spy/20"
+                }`}
               >
                 <Avatar className="w-8 h-8">
                   <AvatarFallback className="bg-spy text-spy-foreground text-sm">
@@ -68,6 +76,9 @@ export function ResultsPhase() {
                 <span className="font-medium">{spy.name}</span>
                 {spy.id === playerId && (
                   <Badge variant="outline" className="text-xs">أنت</Badge>
+                )}
+                {room.revealedSpyIds.includes(spy.id) && (
+                  <Badge variant="secondary" className="text-xs">مكشوف</Badge>
                 )}
               </div>
             ))}
@@ -145,7 +156,7 @@ export function ResultsPhase() {
                     {player.id === playerId && (
                       <Badge variant="outline" className="text-xs">أنت</Badge>
                     )}
-                    {room.revealedSpyIds.includes(player.id) && (
+                    {player.role === "spy" && (
                       <Badge variant="secondary" className="text-xs bg-spy/20 text-spy">جاسوس</Badge>
                     )}
                   </div>
