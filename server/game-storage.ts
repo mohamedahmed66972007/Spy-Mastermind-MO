@@ -416,10 +416,14 @@ function processSpyVotes(room: Room): void {
   const isSpy = revealedPlayer?.role === "spy";
 
   if (isSpy) {
-    // Award points to players who voted for the spy
+    // Award points to ALL players who voted for this specific spy
     room.players.forEach((p) => {
-      if (p.role !== "spy" && room.spyVotes.some((v) => v.voterId === p.id && v.suspectId === revealedId)) {
-        p.score += 1;
+      // Give point if player is not a spy AND voted for the revealed spy
+      if (p.role !== "spy") {
+        const votedForThisSpy = room.spyVotes.find((v) => v.voterId === p.id && v.suspectId === revealedId);
+        if (votedForThisSpy) {
+          p.score = (p.score || 0) + 1;
+        }
       }
     });
     // Move to spy guess phase
@@ -446,7 +450,6 @@ export function submitGuess(playerId: string, guess: string): Room | undefined {
   room.guessValidationVotes = [];
 
   return room;
-}rn room;
 }
 
 export function validateGuess(playerId: string, isCorrect: boolean): Room | undefined {
