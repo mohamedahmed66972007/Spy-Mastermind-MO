@@ -4,6 +4,19 @@
 
 The application supports two game modes: Classic (spies know their word differs) and Blind (spies don't know they're spies). The game features category voting, turn-based questioning, spy voting, and guess validation mechanics with a scoring system across multiple rounds.
 
+## Recent Changes (December 2025)
+
+**Timer System Updates:**
+- Two-phase questioning timer: 60 seconds for asking questions, 30 seconds for answering
+- Display text changes dynamically: "دور X يسأل" (X's turn to ask) → "دور X يجاوب على Y" (X answering Y)
+- Category voting timer: 30 seconds with auto-advance for non-voters
+- Spy voting timer: 60 seconds with auto-advance for non-voters
+
+**UI Simplification:**
+- Removed "جولة الأسئلة" header and player count badge from game header
+- Removed remaining questions count badge (replaced by info button dialog)
+- Added info button (!) next to room code showing all players' question completion status
+
 # User Preferences
 
 Preferred communication style: Simple, everyday language.
