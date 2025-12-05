@@ -230,7 +230,12 @@ function selectCategoryAndStartWordReveal(room: Room): void {
   room.currentWord = getRandomWord(room.selectedCategory);
 
   const spyCount = room.spyCount || getSpyCountForPlayers(room.players.length);
-  const shuffledPlayers = [...room.players].sort(() => Math.random() - 0.5);
+  // Fisher-Yates shuffle for better randomization
+  const shuffledPlayers = [...room.players];
+  for (let i = shuffledPlayers.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [shuffledPlayers[i], shuffledPlayers[j]] = [shuffledPlayers[j], shuffledPlayers[i]];
+  }
   const spyIds = shuffledPlayers.slice(0, spyCount).map((p) => p.id);
 
   if (room.gameMode === "blind") {
