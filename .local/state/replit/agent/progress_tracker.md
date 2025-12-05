@@ -5,3 +5,6 @@
 [x] 5. Fix turn system - auto-advance turn after answer is given (one question per turn)
 [x] 6. Fix timer reset when turn changes
 [x] 7. Add number guessing game button to home page
+[x] 8. Configure workflow with proper webview output type and port 5000
+[x] 9. Verify application is running successfully
+[x] 10. Complete project import process
