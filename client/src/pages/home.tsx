@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Search, Users, Moon, Sun, Play, UserPlus } from "lucide-react";
+import { Search, Users, Moon, Sun, Play, UserPlus, Hash } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -75,14 +75,26 @@ export default function Home() {
           <Search className="w-6 h-6 text-primary" />
           <span className="text-lg font-bold text-foreground">من هو الجاسوس؟</span>
         </div>
-        <Button
-          size="icon"
-          variant="ghost"
-          onClick={toggleTheme}
-          data-testid="button-theme-toggle"
-        >
-          {theme === "dark" ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-2"
+            onClick={() => window.open("https://game-mo2025-v3.onrender.com", "_blank")}
+            data-testid="button-number-game"
+          >
+            <Hash className="w-4 h-4" />
+            لعبة تخمين الأرقام
+          </Button>
+          <Button
+            size="icon"
+            variant="ghost"
+            onClick={toggleTheme}
+            data-testid="button-theme-toggle"
+          >
+            {theme === "dark" ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+          </Button>
+        </div>
       </header>
 
       <main className="flex-1 flex flex-col items-center justify-center p-4 gap-8">

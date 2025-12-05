@@ -321,12 +321,31 @@ function handleMessage(ws: WebSocket, data: string): void {
 
     case "answer_question": {
       if (!playerId) return;
-      const room = answerQuestion(playerId, message.data.answer);
-      if (room) {
+      const result = answerQuestion(playerId, message.data.answer);
+      if (result) {
+        const { room, turnAdvanced } = result;
         broadcastToRoom(room.id, {
           type: "room_updated",
           data: { room },
         });
+        
+        // If turn advanced after answering, handle timer and turn change
+        if (turnAdvanced) {
+          if (room.phase === "spy_voting") {
+            clearTurnTimer(room.id);
+            broadcastToRoom(room.id, {
+              type: "phase_changed",
+              data: { phase: "spy_voting", room },
+            });
+          } else if (room.phase === "questioning" && room.currentTurnPlayerId) {
+            // Turn changed, restart timer for next player
+            startTurnTimer(room.id, true);
+            broadcastToRoom(room.id, {
+              type: "turn_changed",
+              data: { currentPlayerId: room.currentTurnPlayerId, room },
+            });
+          }
+        }
       }
       break;
     }

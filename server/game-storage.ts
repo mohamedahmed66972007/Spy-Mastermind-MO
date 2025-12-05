@@ -285,7 +285,7 @@ export function askQuestion(playerId: string, targetId: string, question: string
   return room;
 }
 
-export function answerQuestion(playerId: string, answer: string): Room | undefined {
+export function answerQuestion(playerId: string, answer: string): { room: Room; turnAdvanced: boolean } | undefined {
   const room = getRoomByPlayerId(playerId);
   if (!room) return undefined;
   if (room.phase !== "questioning") return undefined;
@@ -294,7 +294,15 @@ export function answerQuestion(playerId: string, answer: string): Room | undefin
   if (!lastQuestion || lastQuestion.targetId !== playerId || lastQuestion.answer) return undefined;
 
   lastQuestion.answer = answer;
-  return room;
+  
+  // After answering, automatically advance to next player's turn
+  const previousTurnPlayerId = room.currentTurnPlayerId;
+  const previousPhase = room.phase;
+  advanceToNextTurn(room);
+  // Check if turn changed or phase changed to spy_voting
+  const turnAdvanced = room.currentTurnPlayerId !== previousTurnPlayerId || room.phase !== previousPhase;
+  
+  return { room, turnAdvanced };
 }
 
 export function endTurn(playerId: string): Room | undefined {
