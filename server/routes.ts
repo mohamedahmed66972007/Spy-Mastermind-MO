@@ -300,7 +300,19 @@ function startSpyGuessTimer(roomId: string): void {
   const timer = setTimeout(() => {
     const currentRoom = getRoom(roomId);
     if (currentRoom && currentRoom.phase === "spy_guess") {
-      // Time expired, spy didn't guess - move to results
+      // Time expired, spy didn't guess - award points to players who voted correctly
+      currentRoom.players.forEach((p) => {
+        if (p.role !== "spy") {
+          const votedForAnySpy = currentRoom.spyVotes.find((v) => {
+            if (v.voterId !== p.id) return false;
+            const suspect = currentRoom.players.find(player => player.id === v.suspectId);
+            return suspect?.role === "spy";
+          });
+          if (votedForAnySpy) {
+            p.score = (p.score || 0) + 1;
+          }
+        }
+      });
       currentRoom.phase = "results";
       broadcastToRoom(roomId, {
         type: "phase_changed",
@@ -357,10 +369,24 @@ function forceProcessGuessValidation(roomId: string): void {
   const incorrectVotes = room.guessValidationVotes.filter(v => !v.isCorrect).length;
   
   if (correctVotes >= incorrectVotes && room.guessValidationVotes.length > 0) {
-    // Spy guessed correctly - award point
+    // Spy guessed correctly - award point to spy
     room.players.forEach(p => {
       if (room.revealedSpyIds.includes(p.id)) {
         p.score = (p.score || 0) + 1;
+      }
+    });
+  } else if (room.guessValidationVotes.length > 0) {
+    // Spy guessed wrong - award points to players who voted for the spy
+    room.players.forEach((p) => {
+      if (p.role !== "spy") {
+        const votedForAnySpy = room.spyVotes.find((v) => {
+          if (v.voterId !== p.id) return false;
+          const suspect = room.players.find(player => player.id === v.suspectId);
+          return suspect?.role === "spy";
+        });
+        if (votedForAnySpy) {
+          p.score = (p.score || 0) + 1;
+        }
       }
     });
   }
