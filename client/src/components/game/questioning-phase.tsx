@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { MessageCircle, Send, Clock, User, CheckCircle, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,6 +8,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Progress } from "@/components/ui/progress";
 import { useGame } from "@/lib/game-context";
+import { playQuestionSound, playAnswerSound, playTurnSound, playTimerWarningSound, resumeAudioContext } from "@/lib/sounds";
 
 export function QuestioningPhase() {
   const { room, currentPlayer, playerId, askQuestion, answerQuestion, endTurn, timerRemaining, doneWithQuestions } = useGame();
@@ -15,20 +16,58 @@ export function QuestioningPhase() {
   const [question, setQuestion] = useState("");
   const [answer, setAnswer] = useState("");
   const [localTimer, setLocalTimer] = useState(timerRemaining);
+  const prevQuestionsCount = useRef(room?.questions.length || 0);
+  const prevTurnPlayerId = useRef(room?.currentTurnPlayerId);
+  const playedWarning = useRef(false);
+  const lastAnsweredQuestionIndex = useRef(-1);
 
-  // Update local timer when server sends updates
   useEffect(() => {
     setLocalTimer(timerRemaining);
+    if (timerRemaining > 10) {
+      playedWarning.current = false;
+    }
   }, [timerRemaining]);
 
-  // Countdown timer
   useEffect(() => {
     if (localTimer <= 0) return;
     const interval = setInterval(() => {
-      setLocalTimer((prev) => Math.max(0, prev - 1));
+      setLocalTimer((prev) => {
+        const newVal = Math.max(0, prev - 1);
+        if (newVal === 10 && !playedWarning.current) {
+          playTimerWarningSound();
+          playedWarning.current = true;
+        }
+        return newVal;
+      });
     }, 1000);
     return () => clearInterval(interval);
   }, [localTimer]);
+
+  useEffect(() => {
+    if (!room?.questions) return;
+    
+    if (room.questions.length > prevQuestionsCount.current) {
+      playQuestionSound();
+      prevQuestionsCount.current = room.questions.length;
+    }
+    
+    const lastQIndex = room.questions.length - 1;
+    const lastQ = room.questions[lastQIndex];
+    if (lastQ?.answer && lastQIndex > lastAnsweredQuestionIndex.current) {
+      playAnswerSound();
+      lastAnsweredQuestionIndex.current = lastQIndex;
+    }
+  }, [room?.questions]);
+
+  useEffect(() => {
+    if (room?.currentTurnPlayerId && room.currentTurnPlayerId !== prevTurnPlayerId.current) {
+      if (room.currentTurnPlayerId === playerId) {
+        playTurnSound();
+      }
+      prevTurnPlayerId.current = room.currentTurnPlayerId;
+      playedWarning.current = false;
+    }
+  }, [room?.currentTurnPlayerId, playerId]);
 
   if (!room || !currentPlayer) return null;
 
@@ -45,6 +84,7 @@ export function QuestioningPhase() {
 
   const handleAskQuestion = () => {
     if (selectedTarget && question.trim()) {
+      resumeAudioContext();
       askQuestion(selectedTarget, question.trim());
       setQuestion("");
       setSelectedTarget(null);
@@ -53,6 +93,7 @@ export function QuestioningPhase() {
 
   const handleAnswer = () => {
     if (answer.trim()) {
+      resumeAudioContext();
       answerQuestion(answer.trim());
       setAnswer("");
     }

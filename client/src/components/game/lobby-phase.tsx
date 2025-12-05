@@ -44,7 +44,7 @@ export function LobbyPhase() {
             <Badge
               variant={room.gameMode === "classic" ? "default" : "secondary"}
             >
-              {room.gameMode === "classic" ? "الوضع الكلاسيكي" : "الوضع الأعمى"}
+              {room.gameMode === "classic" ? "الوضع الكلاسيكي" : "وضع التمويه"}
             </Badge>
           </CardTitle>
         </CardHeader>

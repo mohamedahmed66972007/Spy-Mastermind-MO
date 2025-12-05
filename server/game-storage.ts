@@ -405,17 +405,12 @@ function processSpyVotes(room: Room): void {
 
   if (isSpy) {
     room.players.forEach((p) => {
-      if (room.spyVotes.some((v) => v.voterId === p.id && v.suspectId === revealedId)) {
+      if (p.role !== "spy" && room.spyVotes.some((v) => v.voterId === p.id && v.suspectId === revealedId)) {
         p.score += 1;
       }
     });
     room.phase = "spy_guess";
   } else {
-    room.players.forEach((p) => {
-      if (p.role === "spy") {
-        p.score += 1;
-      }
-    });
     room.phase = "results";
   }
 }

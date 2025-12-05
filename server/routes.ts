@@ -87,24 +87,30 @@ function clearTurnTimer(roomId: string): void {
   }
 }
 
-function startTurnTimer(roomId: string): void {
+function startTurnTimer(roomId: string, forceReset: boolean = true): void {
   clearTurnTimer(roomId);
   
   const room = getRoom(roomId);
   if (!room || room.phase !== "questioning") return;
   
-  // Broadcast timer update
-  const timeRemaining = room.turnTimerEnd ? Math.max(0, room.turnTimerEnd - Date.now()) : 60000;
+  const TURN_DURATION = 60000;
+  let timeRemaining: number;
+  
+  if (forceReset || !room.turnTimerEnd || room.turnTimerEnd <= Date.now()) {
+    room.turnTimerEnd = Date.now() + TURN_DURATION;
+    timeRemaining = TURN_DURATION;
+  } else {
+    timeRemaining = room.turnTimerEnd - Date.now();
+  }
+  
   broadcastToRoom(roomId, {
     type: "timer_update",
     data: { timeRemaining: Math.ceil(timeRemaining / 1000) },
   });
   
-  // Set timer for turn end
   const timer = setTimeout(() => {
     const currentRoom = getRoom(roomId);
     if (currentRoom && currentRoom.phase === "questioning" && currentRoom.currentTurnPlayerId) {
-      // Auto-advance turn when timer expires
       const updatedRoom = require("./game-storage").endTurn(currentRoom.currentTurnPlayerId);
       if (updatedRoom) {
         if (updatedRoom.phase === "spy_voting") {
@@ -117,7 +123,7 @@ function startTurnTimer(roomId: string): void {
             type: "turn_changed",
             data: { currentPlayerId: updatedRoom.currentTurnPlayerId || "", room: updatedRoom },
           });
-          startTurnTimer(roomId);
+          startTurnTimer(roomId, true);
         }
       }
     }

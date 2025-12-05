@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -58,8 +58,13 @@ export default function Home() {
     joinRoom(data.playerName, data.roomCode.toUpperCase());
   };
 
+  useEffect(() => {
+    if (room) {
+      setLocation(`/room/${room.id}`);
+    }
+  }, [room, setLocation]);
+
   if (room) {
-    setLocation(`/room/${room.id}`);
     return null;
   }
 
@@ -214,7 +219,7 @@ export default function Home() {
                         >
                           <RadioGroupItem value="blind" id="blind" data-testid="radio-blind" />
                           <div className="flex-1">
-                            <p className="font-medium">الوضع الأعمى</p>
+                            <p className="font-medium">وضع التمويه</p>
                             <p className="text-sm text-muted-foreground">
                               الجاسوس لا يعرف أنه جاسوس ويرى كلمة مختلفة
                             </p>

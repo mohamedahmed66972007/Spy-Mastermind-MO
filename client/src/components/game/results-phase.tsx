@@ -1,3 +1,4 @@
+import { useEffect, useRef } from "react";
 import { Trophy, Medal, Star, RotateCcw, Crown, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -5,18 +6,31 @@ import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
 import { useGame } from "@/lib/game-context";
+import { playResultSound } from "@/lib/sounds";
 
 export function ResultsPhase() {
   const { room, currentPlayer, isHost, nextRound, playerId } = useGame();
+  const soundPlayed = useRef(false);
+
+  const spyWon = room?.guessValidationVotes ? 
+    room.guessValidationVotes.filter((v) => v.isCorrect).length >
+    room.guessValidationVotes.filter((v) => !v.isCorrect).length : false;
+
+  const isSpy = room?.revealedSpyIds?.includes(playerId || "") || false;
+
+  useEffect(() => {
+    if (!soundPlayed.current && room) {
+      const playerWon = isSpy ? spyWon : !spyWon;
+      playResultSound(playerWon);
+      soundPlayed.current = true;
+    }
+  }, [room, isSpy, spyWon]);
 
   if (!room || !currentPlayer) return null;
 
   const sortedPlayers = [...room.players].sort((a, b) => b.score - a.score);
 
   const spies = room.players.filter((p) => room.revealedSpyIds.includes(p.id));
-
-  const spyWon = room.guessValidationVotes.filter((v) => v.isCorrect).length >
-    room.guessValidationVotes.filter((v) => !v.isCorrect).length;
 
   return (
     <div className="space-y-6">

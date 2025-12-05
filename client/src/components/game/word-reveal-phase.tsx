@@ -67,11 +67,6 @@ export function WordRevealPhase() {
                       {room.selectedCategory === "animals" && "حيوان"}
                       {room.selectedCategory === "cars" && "سيارة"}
                     </p>
-                    {room.gameMode === "blind" && isSpy && (
-                      <p className="text-sm text-warning">
-                        (قد تكون كلمتك مختلفة عن الآخرين!)
-                      </p>
-                    )}
                   </>
                 )}
                 <EyeOff className="w-6 h-6 mx-auto text-muted-foreground mt-4" />

@@ -5,11 +5,13 @@ import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useGame } from "@/lib/game-context";
+import { playMessageSound, resumeAudioContext } from "@/lib/sounds";
 
 export function ChatPanel() {
   const { room, playerId, sendChatMessage } = useGame();
   const [message, setMessage] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
+  const prevMessageCount = useRef(room?.messages.length || 0);
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -17,10 +19,21 @@ export function ChatPanel() {
     }
   }, [room?.messages]);
 
+  useEffect(() => {
+    if (room?.messages && room.messages.length > prevMessageCount.current) {
+      const lastMessage = room.messages[room.messages.length - 1];
+      if (lastMessage.playerId !== playerId) {
+        playMessageSound();
+      }
+      prevMessageCount.current = room.messages.length;
+    }
+  }, [room?.messages, playerId]);
+
   if (!room) return null;
 
   const handleSend = () => {
     if (message.trim()) {
+      resumeAudioContext();
       sendChatMessage(message.trim());
       setMessage("");
     }

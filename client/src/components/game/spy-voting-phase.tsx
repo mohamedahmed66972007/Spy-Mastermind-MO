@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Progress } from "@/components/ui/progress";
 import { useGame } from "@/lib/game-context";
+import { playVoteSound, resumeAudioContext } from "@/lib/sounds";
 
 export function SpyVotingPhase() {
   const { room, currentPlayer, playerId, voteSpy } = useGame();
@@ -24,6 +25,8 @@ export function SpyVotingPhase() {
 
   const handleVote = () => {
     if (selectedSuspect && !hasVoted) {
+      resumeAudioContext();
+      playVoteSound();
       voteSpy(selectedSuspect);
     }
   };
