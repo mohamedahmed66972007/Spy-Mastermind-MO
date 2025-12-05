@@ -25,6 +25,10 @@ export interface Player {
   hasVoted?: boolean;
   votedFor?: string;
   isEliminated?: boolean;
+  questionsRemaining?: number;
+  doneWithQuestions?: boolean;
+  sessionToken?: string;
+  disconnectedAt?: number;
 }
 
 export interface CategoryVote {
@@ -73,6 +77,10 @@ export interface Room {
   guessValidationVotes: { playerId: string; isCorrect: boolean }[];
   revealedSpyIds: string[];
   spyCount: number;
+  questionsPerPlayer: number;
+  turnQueue: string[];
+  currentTurnPlayerId?: string;
+  turnTimerEnd?: number;
 }
 
 export const categories = [
@@ -112,18 +120,24 @@ export type WebSocketMessage =
   | { type: "send_message"; data: { text: string } }
   | { type: "update_spy_count"; data: { count: number } }
   | { type: "next_round" }
-  | { type: "leave_room" };
+  | { type: "leave_room" }
+  | { type: "done_with_questions" }
+  | { type: "reconnect"; data: { sessionToken: string; roomCode: string } }
+  | { type: "confirm_word_reveal" };
 
 export type ServerMessage =
-  | { type: "room_created"; data: { room: Room; playerId: string } }
-  | { type: "room_joined"; data: { room: Room; playerId: string } }
+  | { type: "room_created"; data: { room: Room; playerId: string; sessionToken: string } }
+  | { type: "room_joined"; data: { room: Room; playerId: string; sessionToken: string } }
   | { type: "room_updated"; data: { room: Room } }
   | { type: "game_started"; data: { room: Room } }
   | { type: "error"; data: { message: string } }
   | { type: "player_left"; data: { playerId: string; room: Room } }
   | { type: "timer_update"; data: { timeRemaining: number } }
   | { type: "phase_changed"; data: { phase: GamePhase; room: Room } }
-  | { type: "new_message"; data: { message: Message } };
+  | { type: "new_message"; data: { message: Message } }
+  | { type: "reconnected"; data: { room: Room; playerId: string } }
+  | { type: "spy_revealed"; data: { spyIds: string[]; room: Room } }
+  | { type: "turn_changed"; data: { currentPlayerId: string; room: Room } };
 
 export function getSpyCountForPlayers(playerCount: number): number {
   if (playerCount <= 6) return 1;

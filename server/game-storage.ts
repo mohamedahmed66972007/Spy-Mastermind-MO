@@ -5,6 +5,10 @@ import { randomUUID } from "crypto";
 
 const rooms = new Map<string, Room>();
 const playerToRoom = new Map<string, string>();
+const sessionTokenToPlayer = new Map<string, { playerId: string; roomId: string }>();
+
+const QUESTIONS_PER_PLAYER = 3;
+const SESSION_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes
 
 function generateRoomId(): string {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -15,9 +19,14 @@ function generateRoomId(): string {
   return result;
 }
 
-export function createRoom(playerName: string, gameMode: GameMode): { room: Room; playerId: string } {
+function generateSessionToken(): string {
+  return randomUUID();
+}
+
+export function createRoom(playerName: string, gameMode: GameMode): { room: Room; playerId: string; sessionToken: string } {
   const roomId = generateRoomId();
   const playerId = randomUUID();
+  const sessionToken = generateSessionToken();
   
   const player: Player = {
     id: playerId,
@@ -25,6 +34,9 @@ export function createRoom(playerName: string, gameMode: GameMode): { room: Room
     isHost: true,
     isReady: true,
     score: 0,
+    sessionToken,
+    questionsRemaining: QUESTIONS_PER_PLAYER,
+    doneWithQuestions: false,
   };
 
   const room: Room = {
@@ -43,33 +55,88 @@ export function createRoom(playerName: string, gameMode: GameMode): { room: Room
     guessValidationVotes: [],
     revealedSpyIds: [],
     spyCount: 1,
+    questionsPerPlayer: QUESTIONS_PER_PLAYER,
+    turnQueue: [],
   };
 
   rooms.set(roomId, room);
   playerToRoom.set(playerId, roomId);
+  sessionTokenToPlayer.set(sessionToken, { playerId, roomId });
 
-  return { room, playerId };
+  return { room, playerId, sessionToken };
 }
 
-export function joinRoom(playerName: string, roomCode: string): { room: Room; playerId: string } | null {
+export function joinRoom(playerName: string, roomCode: string): { room: Room; playerId: string; sessionToken: string } | null {
   const room = rooms.get(roomCode);
   if (!room) return null;
   if (room.phase !== "lobby") return null;
   if (room.players.length >= 10) return null;
 
   const playerId = randomUUID();
+  const sessionToken = generateSessionToken();
   const player: Player = {
     id: playerId,
     name: playerName,
     isHost: false,
     isReady: false,
     score: 0,
+    sessionToken,
+    questionsRemaining: QUESTIONS_PER_PLAYER,
+    doneWithQuestions: false,
   };
 
   room.players.push(player);
   playerToRoom.set(playerId, roomCode);
+  sessionTokenToPlayer.set(sessionToken, { playerId, roomId: roomCode });
 
-  return { room, playerId };
+  return { room, playerId, sessionToken };
+}
+
+export function reconnectPlayer(sessionToken: string, roomCode: string): { room: Room; playerId: string } | null {
+  const sessionData = sessionTokenToPlayer.get(sessionToken);
+  if (!sessionData) return null;
+  if (sessionData.roomId !== roomCode) return null;
+
+  const room = rooms.get(roomCode);
+  if (!room) return null;
+
+  const player = room.players.find(p => p.id === sessionData.playerId);
+  if (!player) return null;
+
+  // Check if session has expired (30 minutes)
+  if (player.disconnectedAt && Date.now() - player.disconnectedAt > SESSION_TIMEOUT_MS) {
+    // Session expired, remove player
+    room.players = room.players.filter(p => p.id !== player.id);
+    playerToRoom.delete(player.id);
+    sessionTokenToPlayer.delete(sessionToken);
+    return null;
+  }
+
+  // Reconnect player
+  player.disconnectedAt = undefined;
+  playerToRoom.set(sessionData.playerId, roomCode);
+
+  return { room, playerId: sessionData.playerId };
+}
+
+export function markPlayerDisconnected(playerId: string): Room | undefined {
+  const room = getRoomByPlayerId(playerId);
+  if (!room) return undefined;
+
+  const player = room.players.find(p => p.id === playerId);
+  if (player) {
+    player.disconnectedAt = Date.now();
+  }
+
+  return room;
+}
+
+export function isPlayerDisconnected(playerId: string): boolean {
+  const room = getRoomByPlayerId(playerId);
+  if (!room) return true;
+  
+  const player = room.players.find(p => p.id === playerId);
+  return player?.disconnectedAt !== undefined;
 }
 
 export function getRoom(roomId: string): Room | undefined {
@@ -173,6 +240,9 @@ function selectCategoryAndStartWordReveal(room: Room): void {
       player.role = "player";
       player.word = room.currentWord;
     }
+    // Reset question state for new round
+    player.questionsRemaining = QUESTIONS_PER_PLAYER;
+    player.doneWithQuestions = false;
   });
 
   room.phase = "word_reveal";
@@ -183,6 +253,10 @@ function selectCategoryAndStartWordReveal(room: Room): void {
   room.currentPlayerIndex = 0;
   room.spyGuess = undefined;
   room.guessValidationVotes = [];
+  // Initialize turn queue with all players
+  room.turnQueue = room.players.map(p => p.id);
+  room.currentTurnPlayerId = room.turnQueue[0];
+  room.turnTimerEnd = undefined;
 }
 
 export function askQuestion(playerId: string, targetId: string, question: string): Room | undefined {
@@ -190,8 +264,13 @@ export function askQuestion(playerId: string, targetId: string, question: string
   if (!room) return undefined;
   if (room.phase !== "questioning") return undefined;
 
-  const currentPlayer = room.players[room.currentPlayerIndex];
-  if (currentPlayer.id !== playerId) return undefined;
+  // Check if it's this player's turn
+  if (room.currentTurnPlayerId !== playerId) return undefined;
+
+  const player = room.players.find(p => p.id === playerId);
+  if (!player) return undefined;
+  if (player.questionsRemaining === undefined || player.questionsRemaining <= 0) return undefined;
+  if (player.doneWithQuestions) return undefined;
 
   room.questions.push({
     askerId: playerId,
@@ -199,6 +278,8 @@ export function askQuestion(playerId: string, targetId: string, question: string
     question,
   });
 
+  // Decrease player's remaining questions
+  player.questionsRemaining = (player.questionsRemaining || QUESTIONS_PER_PLAYER) - 1;
   room.questionsAsked++;
 
   return room;
@@ -221,18 +302,71 @@ export function endTurn(playerId: string): Room | undefined {
   if (!room) return undefined;
   if (room.phase !== "questioning") return undefined;
 
-  const currentPlayer = room.players[room.currentPlayerIndex];
-  if (currentPlayer.id !== playerId) return undefined;
+  // Check if it's this player's turn
+  if (room.currentTurnPlayerId !== playerId) return undefined;
 
-  room.currentPlayerIndex++;
-  room.questionsAsked = 0;
+  // Move to next player in turn queue
+  advanceToNextTurn(room);
 
-  if (room.currentPlayerIndex >= room.players.length) {
-    room.phase = "spy_voting";
-    room.spyVotes = [];
+  return room;
+}
+
+export function markDoneWithQuestions(playerId: string): Room | undefined {
+  const room = getRoomByPlayerId(playerId);
+  if (!room) return undefined;
+  if (room.phase !== "questioning") return undefined;
+
+  const player = room.players.find(p => p.id === playerId);
+  if (!player) return undefined;
+
+  player.doneWithQuestions = true;
+
+  // If it's this player's turn, advance to next
+  if (room.currentTurnPlayerId === playerId) {
+    advanceToNextTurn(room);
   }
 
   return room;
+}
+
+function advanceToNextTurn(room: Room): void {
+  // Find the current player's position in the queue
+  const currentIndex = room.turnQueue.indexOf(room.currentTurnPlayerId || "");
+  
+  // Look for next eligible player (starting from next position)
+  let attempts = 0;
+  let nextIndex = (currentIndex + 1) % room.turnQueue.length;
+  
+  while (attempts < room.turnQueue.length) {
+    const nextPlayerId = room.turnQueue[nextIndex];
+    const nextPlayer = room.players.find(p => p.id === nextPlayerId);
+    
+    // Check if player is eligible (has questions and not done)
+    if (nextPlayer && 
+        !nextPlayer.doneWithQuestions && 
+        (nextPlayer.questionsRemaining === undefined || nextPlayer.questionsRemaining > 0)) {
+      room.currentTurnPlayerId = nextPlayerId;
+      room.currentPlayerIndex = room.players.findIndex(p => p.id === nextPlayerId);
+      room.turnTimerEnd = Date.now() + 60000; // 1 minute timer
+      return;
+    }
+    
+    nextIndex = (nextIndex + 1) % room.turnQueue.length;
+    attempts++;
+  }
+  
+  // No more eligible players, move to spy voting
+  room.phase = "spy_voting";
+  room.spyVotes = [];
+  room.currentTurnPlayerId = undefined;
+  room.turnTimerEnd = undefined;
+}
+
+export function checkAllPlayersDoneWithQuestions(room: Room): boolean {
+  return room.players.every(p => 
+    p.doneWithQuestions || 
+    (p.questionsRemaining !== undefined && p.questionsRemaining <= 0)
+  );
 }
 
 export function voteSpy(playerId: string, suspectId: string): Room | undefined {
@@ -355,6 +489,9 @@ export function nextRound(playerId: string): Room | undefined {
   room.spyGuess = undefined;
   room.guessValidationVotes = [];
   room.revealedSpyIds = [];
+  room.turnQueue = [];
+  room.currentTurnPlayerId = undefined;
+  room.turnTimerEnd = undefined;
 
   room.players.forEach((p) => {
     p.role = undefined;
@@ -362,7 +499,23 @@ export function nextRound(playerId: string): Room | undefined {
     p.hasVoted = false;
     p.votedFor = undefined;
     p.isEliminated = false;
+    p.questionsRemaining = QUESTIONS_PER_PLAYER;
+    p.doneWithQuestions = false;
   });
+
+  return room;
+}
+
+export function startQuestioningPhase(roomId: string): Room | undefined {
+  const room = rooms.get(roomId);
+  if (!room) return undefined;
+  if (room.phase !== "word_reveal") return undefined;
+
+  room.phase = "questioning";
+  room.turnQueue = room.players.map(p => p.id);
+  room.currentTurnPlayerId = room.turnQueue[0];
+  room.currentPlayerIndex = 0;
+  room.turnTimerEnd = Date.now() + 60000; // 1 minute timer for first turn
 
   return room;
 }
