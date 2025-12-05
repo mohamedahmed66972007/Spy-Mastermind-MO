@@ -34,6 +34,12 @@ Preferred communication style: Simple, everyday language.
 
 **Form Handling**: React Hook Form with Zod validation for type-safe form inputs
 
+**PWA Support**: 
+- Progressive Web App with manifest.json for app installation
+- Service worker for offline caching
+- Install prompt button in header (shows when browser supports installation)
+- Player name persistence in localStorage for auto-fill
+
 ## Backend Architecture
 
 **Server Framework**: Express.js with TypeScript running on Node.js
@@ -51,6 +57,7 @@ Preferred communication style: Simple, everyday language.
 - Word generation system with categorized Arabic word banks
 - Automatic spy count calculation based on player count with host override capability
 - Vote aggregation and consensus mechanisms
+- Randomized turn order for each new game round (shuffles player order when game starts/restarts)
 
 **API Design**: Message-based WebSocket protocol with typed messages (WebSocketMessage/ServerMessage) rather than REST endpoints
 

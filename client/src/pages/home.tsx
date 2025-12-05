@@ -121,12 +121,14 @@ export default function Home() {
           <span className="text-lg font-bold text-foreground">من هو الجاسوس؟</span>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
-          {installPrompt && !isInstalled && (
+          {!isInstalled && (
             <Button
               variant="default"
               size="sm"
               className="gap-2"
-              onClick={handleInstallClick}
+              onClick={installPrompt ? handleInstallClick : () => {
+                alert("لتحميل التطبيق:\n1. افتح الموقع في متصفح Chrome أو Edge\n2. اضغط على القائمة (النقاط الثلاث)\n3. اختر 'إضافة إلى الشاشة الرئيسية' أو 'تثبيت التطبيق'");
+              }}
               data-testid="button-install-app"
             >
               <Download className="w-4 h-4" />
