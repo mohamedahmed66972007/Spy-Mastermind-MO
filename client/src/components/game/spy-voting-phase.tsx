@@ -119,8 +119,8 @@ export function SpyVotingPhase() {
                   isSelected
                     ? "border-spy ring-2 ring-spy/20 bg-spy/5"
                     : "border-border hover-elevate"
-                } ${hasVoted ? "opacity-60 pointer-events-none" : "cursor-pointer"}`}
-                onClick={() => !hasVoted && setSelectedSuspect(player.id)}
+                } ${hasVoted || isMe ? "opacity-60 pointer-events-none" : "cursor-pointer"}`}
+                onClick={() => !hasVoted && !isMe && setSelectedSuspect(player.id)}
                 data-testid={`vote-player-${player.id}`}
               >
                 <div className="flex items-center justify-between gap-4">
@@ -139,7 +139,7 @@ export function SpyVotingPhase() {
                     <div>
                       <p className="font-medium flex items-center gap-2">
                         {player.name}
-                        {isMe && <Badge variant="outline" className="text-xs">أنت</Badge>}
+                        {isMe && <Badge variant="outline" className="text-xs">لا يمكنك التصويت لنفسك</Badge>}
                       </p>
                       <p className="text-sm text-muted-foreground">
                         {votes} {votes === 1 ? "صوت" : "أصوات"}

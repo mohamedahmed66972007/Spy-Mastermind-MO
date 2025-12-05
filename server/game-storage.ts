@@ -435,6 +435,9 @@ export function voteSpy(playerId: string, suspectId: string): Room | undefined {
   if (!room) return undefined;
   if (room.phase !== "spy_voting") return undefined;
 
+  // Prevent voting for yourself
+  if (playerId === suspectId) return undefined;
+
   const existingVote = room.spyVotes.find((v) => v.voterId === playerId);
   if (existingVote) return undefined;
 
