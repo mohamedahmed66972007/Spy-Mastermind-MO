@@ -125,6 +125,12 @@ export function GameHeader() {
                     <div className="space-y-2">
                       <Search className="w-12 h-12 mx-auto text-spy" />
                       <p className="text-2xl font-bold text-spy">أنت الجاسوس!</p>
+                      <p className="text-xl font-medium text-foreground mt-3">
+                        {room?.selectedCategory === "countries" && "دولة"}
+                        {room?.selectedCategory === "fruits_vegetables" && "خضروات وفواكه"}
+                        {room?.selectedCategory === "animals" && "حيوان"}
+                        {room?.selectedCategory === "cars" && "سيارة"}
+                      </p>
                       <p className="text-muted-foreground text-sm">
                         حاول اكتشاف الكلمة من أسئلة اللاعبين
                       </p>
