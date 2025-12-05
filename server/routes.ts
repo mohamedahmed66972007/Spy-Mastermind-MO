@@ -111,7 +111,7 @@ function startTurnTimer(roomId: string, forceReset: boolean = true): void {
   const timer = setTimeout(() => {
     const currentRoom = getRoom(roomId);
     if (currentRoom && currentRoom.phase === "questioning" && currentRoom.currentTurnPlayerId) {
-      const updatedRoom = require("./game-storage").endTurn(currentRoom.currentTurnPlayerId);
+      const updatedRoom = endTurn(currentRoom.currentTurnPlayerId);
       if (updatedRoom) {
         if (updatedRoom.phase === "spy_voting") {
           broadcastToRoom(roomId, {

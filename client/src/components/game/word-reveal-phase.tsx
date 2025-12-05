@@ -14,8 +14,18 @@ export function WordRevealPhase() {
   const word = currentPlayer.word || "";
 
   const handleInfoClick = () => {
-    if (word && !isSpy) {
-      const searchQuery = encodeURIComponent(word);
+    if (word && !isSpy && room?.selectedCategory) {
+      let categoryPrefix = "";
+      if (room.selectedCategory === "countries") {
+        categoryPrefix = "دولة ";
+      } else if (room.selectedCategory === "fruits_vegetables") {
+        categoryPrefix = "فاكهة ";
+      } else if (room.selectedCategory === "animals") {
+        categoryPrefix = "حيوان ";
+      } else if (room.selectedCategory === "cars") {
+        categoryPrefix = "سيارة ";
+      }
+      const searchQuery = encodeURIComponent(categoryPrefix + word);
       window.open(`https://www.google.com/search?q=${searchQuery}`, "_blank");
     }
   };
@@ -51,6 +61,12 @@ export function WordRevealPhase() {
                     <Search className="w-16 h-16 mx-auto text-spy" />
                     <p className="text-3xl font-bold text-spy">
                       أنت الجاسوس!
+                    </p>
+                    <p className="text-2xl font-medium text-foreground mt-4">
+                      {room.selectedCategory === "countries" && "دولة"}
+                      {room.selectedCategory === "fruits_vegetables" && "خضروات وفواكه"}
+                      {room.selectedCategory === "animals" && "حيوان"}
+                      {room.selectedCategory === "cars" && "سيارة"}
                     </p>
                     <p className="text-muted-foreground">
                       حاول اكتشاف الكلمة من أسئلة اللاعبين

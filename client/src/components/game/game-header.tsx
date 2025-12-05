@@ -120,7 +120,7 @@ export function GameHeader() {
                 <DialogHeader>
                   <DialogTitle className="text-center">كلمتك</DialogTitle>
                 </DialogHeader>
-                <div className="text-center py-6">
+                <div className="text-center py-6 space-y-4">
                   {isSpy && room?.gameMode === "classic" ? (
                     <div className="space-y-2">
                       <Search className="w-12 h-12 mx-auto text-spy" />
@@ -130,7 +130,39 @@ export function GameHeader() {
                       </p>
                     </div>
                   ) : (
-                    <p className="text-3xl font-bold text-foreground">{playerWord}</p>
+                    <>
+                      <p className="text-3xl font-bold text-foreground">{playerWord}</p>
+                      <p className="text-muted-foreground">
+                        {room?.selectedCategory === "countries" && "دولة"}
+                        {room?.selectedCategory === "fruits_vegetables" && "خضروات وفواكه"}
+                        {room?.selectedCategory === "animals" && "حيوان"}
+                        {room?.selectedCategory === "cars" && "سيارة"}
+                      </p>
+                      <Button
+                        variant="outline"
+                        onClick={() => {
+                          if (playerWord && room?.selectedCategory) {
+                            let categoryPrefix = "";
+                            if (room.selectedCategory === "countries") {
+                              categoryPrefix = "دولة ";
+                            } else if (room.selectedCategory === "fruits_vegetables") {
+                              categoryPrefix = "فاكهة ";
+                            } else if (room.selectedCategory === "animals") {
+                              categoryPrefix = "حيوان ";
+                            } else if (room.selectedCategory === "cars") {
+                              categoryPrefix = "سيارة ";
+                            }
+                            const searchQuery = encodeURIComponent(categoryPrefix + playerWord);
+                            window.open(`https://www.google.com/search?q=${searchQuery}`, "_blank");
+                          }
+                        }}
+                        className="gap-2 w-full"
+                      >
+                        <Eye className="w-4 h-4" />
+                        معلومات عن الكلمة
+                        <Search className="w-4 h-4" />
+                      </Button>
+                    </>
                   )}
                 </div>
               </DialogContent>
