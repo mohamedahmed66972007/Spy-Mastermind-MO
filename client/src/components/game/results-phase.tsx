@@ -12,13 +12,8 @@ export function ResultsPhase() {
   if (!room || !currentPlayer) return null;
 
   const sortedPlayers = [...room.players].sort((a, b) => b.score - a.score);
-  const topThree = sortedPlayers.slice(0, 3);
-  const rest = sortedPlayers.slice(3);
 
   const spies = room.players.filter((p) => room.revealedSpyIds.includes(p.id));
-  const regularPlayers = room.players.filter(
-    (p) => !room.revealedSpyIds.includes(p.id)
-  );
 
   const spyWon = room.guessValidationVotes.filter((v) => v.isCorrect).length >
     room.guessValidationVotes.filter((v) => !v.isCorrect).length;
@@ -98,92 +93,58 @@ export function ResultsPhase() {
             ترتيب النقاط
           </CardTitle>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex justify-center items-end gap-4 py-4">
-            {topThree.map((player, index) => {
-              const positions = [1, 0, 2];
-              const displayIndex = positions[index];
-              const heights = ["h-24", "h-32", "h-20"];
-              const bgColors = [
-                "bg-gradient-to-b from-amber-400 to-amber-500",
-                "bg-gradient-to-b from-yellow-300 to-yellow-400",
-                "bg-gradient-to-b from-orange-300 to-orange-400",
-              ];
-              const icons = [
-                <Medal key="1" className="w-6 h-6" />,
-                <Crown key="0" className="w-8 h-8" />,
-                <Star key="2" className="w-5 h-5" />,
-              ];
-
-              return (
-                <div
-                  key={player.id}
-                  className="flex flex-col items-center animate-count-up"
-                  style={{
-                    order: displayIndex,
-                    animationDelay: `${index * 0.1}s`,
-                  }}
-                >
-                  <Avatar className="w-12 h-12 mb-2 border-2 border-background shadow-lg">
+        <CardContent className="space-y-2">
+          {sortedPlayers.map((player, index) => {
+            const rank = index + 1;
+            const isTopThree = rank <= 3;
+            const bgColors = [
+              "bg-gradient-to-l from-yellow-100 to-yellow-50 border-yellow-300",
+              "bg-gradient-to-l from-gray-100 to-gray-50 border-gray-300",
+              "bg-gradient-to-l from-orange-100 to-orange-50 border-orange-300",
+            ];
+            const textColors = ["text-yellow-700", "text-gray-600", "text-orange-600"];
+            
+            return (
+              <div
+                key={player.id}
+                className={`flex items-center justify-between p-4 rounded-lg border ${
+                  isTopThree ? bgColors[index] : "bg-muted/30 border-border"
+                }`}
+              >
+                <div className="flex items-center gap-4">
+                  <span className={`text-2xl font-bold w-10 ${isTopThree ? textColors[index] : "text-muted-foreground"}`}>
+                    #{rank}
+                  </span>
+                  <Avatar className="w-10 h-10">
                     <AvatarFallback
-                      className="text-lg font-bold"
+                      className="text-base font-bold"
                       style={{
-                        backgroundColor: `hsl(${(sortedPlayers.indexOf(player) * 40) % 360}, 50%, 50%)`,
+                        backgroundColor: `hsl(${(index * 40) % 360}, 50%, 50%)`,
                         color: "white",
                       }}
                     >
                       {player.name.charAt(0)}
                     </AvatarFallback>
                   </Avatar>
-                  <p className="font-medium text-sm mb-1 text-center truncate max-w-[80px]">
-                    {player.name}
-                  </p>
-                  <div
-                    className={`${heights[index]} w-16 ${bgColors[index]} rounded-t-lg flex flex-col items-center justify-start pt-2 text-white shadow-lg`}
-                  >
-                    {icons[index]}
-                    <span className="font-bold text-lg mt-1">{player.score}</span>
+                  <div className="flex items-center gap-2">
+                    <span className="font-semibold text-lg">{player.name}</span>
+                    {player.id === playerId && (
+                      <Badge variant="outline" className="text-xs">أنت</Badge>
+                    )}
+                    {room.revealedSpyIds.includes(player.id) && (
+                      <Badge variant="secondary" className="text-xs bg-spy/20 text-spy">جاسوس</Badge>
+                    )}
                   </div>
                 </div>
-              );
-            })}
-          </div>
-
-          {rest.length > 0 && (
-            <>
-              <Separator />
-              <div className="space-y-2">
-                {rest.map((player, index) => (
-                  <div
-                    key={player.id}
-                    className="flex items-center justify-between p-3 rounded-lg bg-muted/50"
-                  >
-                    <div className="flex items-center gap-3">
-                      <span className="w-6 text-center text-muted-foreground font-medium">
-                        {index + 4}
-                      </span>
-                      <Avatar className="w-8 h-8">
-                        <AvatarFallback
-                          className="text-sm"
-                          style={{
-                            backgroundColor: `hsl(${(sortedPlayers.indexOf(player) * 40) % 360}, 50%, 50%)`,
-                            color: "white",
-                          }}
-                        >
-                          {player.name.charAt(0)}
-                        </AvatarFallback>
-                      </Avatar>
-                      <span className="font-medium">{player.name}</span>
-                      {player.id === playerId && (
-                        <Badge variant="outline" className="text-xs">أنت</Badge>
-                      )}
-                    </div>
-                    <span className="font-bold">{player.score} نقطة</span>
-                  </div>
-                ))}
+                <div className="flex items-center gap-2">
+                  {rank === 1 && <Crown className="w-6 h-6 text-yellow-500" />}
+                  {rank === 2 && <Medal className="w-5 h-5 text-gray-400" />}
+                  {rank === 3 && <Star className="w-5 h-5 text-orange-400" />}
+                  <span className="text-xl font-bold">({player.score})</span>
+                </div>
               </div>
-            </>
-          )}
+            );
+          })}
         </CardContent>
       </Card>
 

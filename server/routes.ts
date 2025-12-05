@@ -20,6 +20,10 @@ import {
   nextRound,
   sendMessage,
   leaveRoom,
+  markDoneWithQuestions,
+  reconnectPlayer,
+  markPlayerDisconnected,
+  startQuestioningPhase,
 } from "./game-storage";
 
 const clients = new Map<string, WebSocket>();
@@ -58,18 +62,69 @@ function startWordRevealTimer(roomId: string): void {
   clearRoomTimer(roomId);
   
   const timer = setTimeout(() => {
-    const room = getRoom(roomId);
-    if (room && room.phase === "word_reveal") {
-      room.phase = "questioning";
+    const room = startQuestioningPhase(roomId);
+    if (room) {
       broadcastToRoom(roomId, {
         type: "phase_changed",
         data: { phase: "questioning", room },
       });
+      // Start turn timer for first player
+      startTurnTimer(roomId);
     }
     roomTimers.delete(roomId);
   }, 10000);
   
   roomTimers.set(roomId, timer);
+}
+
+const turnTimers = new Map<string, NodeJS.Timeout>();
+
+function clearTurnTimer(roomId: string): void {
+  const timer = turnTimers.get(roomId);
+  if (timer) {
+    clearTimeout(timer);
+    turnTimers.delete(roomId);
+  }
+}
+
+function startTurnTimer(roomId: string): void {
+  clearTurnTimer(roomId);
+  
+  const room = getRoom(roomId);
+  if (!room || room.phase !== "questioning") return;
+  
+  // Broadcast timer update
+  const timeRemaining = room.turnTimerEnd ? Math.max(0, room.turnTimerEnd - Date.now()) : 60000;
+  broadcastToRoom(roomId, {
+    type: "timer_update",
+    data: { timeRemaining: Math.ceil(timeRemaining / 1000) },
+  });
+  
+  // Set timer for turn end
+  const timer = setTimeout(() => {
+    const currentRoom = getRoom(roomId);
+    if (currentRoom && currentRoom.phase === "questioning" && currentRoom.currentTurnPlayerId) {
+      // Auto-advance turn when timer expires
+      const updatedRoom = require("./game-storage").endTurn(currentRoom.currentTurnPlayerId);
+      if (updatedRoom) {
+        if (updatedRoom.phase === "spy_voting") {
+          broadcastToRoom(roomId, {
+            type: "phase_changed",
+            data: { phase: "spy_voting", room: updatedRoom },
+          });
+        } else {
+          broadcastToRoom(roomId, {
+            type: "turn_changed",
+            data: { currentPlayerId: updatedRoom.currentTurnPlayerId || "", room: updatedRoom },
+          });
+          startTurnTimer(roomId);
+        }
+      }
+    }
+    turnTimers.delete(roomId);
+  }, timeRemaining);
+  
+  turnTimers.set(roomId, timer);
 }
 
 function handleMessage(ws: WebSocket, data: string): void {
@@ -96,7 +151,7 @@ function handleMessage(ws: WebSocket, data: string): void {
       playerConnections.set(ws, result.playerId);
       sendToPlayer(result.playerId, {
         type: "room_created",
-        data: { room: result.room, playerId: result.playerId },
+        data: { room: result.room, playerId: result.playerId, sessionToken: result.sessionToken },
       });
       break;
     }
@@ -117,6 +172,28 @@ function handleMessage(ws: WebSocket, data: string): void {
       playerConnections.set(ws, result.playerId);
       sendToPlayer(result.playerId, {
         type: "room_joined",
+        data: { room: result.room, playerId: result.playerId, sessionToken: result.sessionToken },
+      });
+      broadcastToRoom(result.room.id, {
+        type: "room_updated",
+        data: { room: result.room },
+      }, result.playerId);
+      break;
+    }
+
+    case "reconnect": {
+      const result = reconnectPlayer(message.data.sessionToken, message.data.roomCode);
+      if (!result) {
+        ws.send(JSON.stringify({
+          type: "error",
+          data: { message: "تعذر إعادة الاتصال - الجلسة منتهية أو الغرفة غير موجودة" },
+        }));
+        return;
+      }
+      clients.set(result.playerId, ws);
+      playerConnections.set(ws, result.playerId);
+      sendToPlayer(result.playerId, {
+        type: "reconnected",
         data: { room: result.room, playerId: result.playerId },
       });
       broadcastToRoom(result.room.id, {
@@ -193,9 +270,33 @@ function handleMessage(ws: WebSocket, data: string): void {
 
     case "confirm_word_reveal": {
       if (!playerId) return;
-      const room = getRoomByPlayerId(playerId);
-      if (room && room.phase === "word_reveal") {
-        break;
+      // This is just an acknowledgement, the timer handles the transition
+      break;
+    }
+
+    case "done_with_questions": {
+      if (!playerId) return;
+      const prevPhase = getRoomByPlayerId(playerId)?.phase;
+      const room = markDoneWithQuestions(playerId);
+      if (room) {
+        broadcastToRoom(room.id, {
+          type: "room_updated",
+          data: { room },
+        });
+        if (prevPhase === "questioning" && room.phase === "spy_voting") {
+          clearTurnTimer(room.id);
+          broadcastToRoom(room.id, {
+            type: "phase_changed",
+            data: { phase: "spy_voting", room },
+          });
+        } else if (room.phase === "questioning" && room.currentTurnPlayerId) {
+          // Turn changed, restart timer
+          startTurnTimer(room.id);
+          broadcastToRoom(room.id, {
+            type: "turn_changed",
+            data: { currentPlayerId: room.currentTurnPlayerId, room },
+          });
+        }
       }
       break;
     }
@@ -234,9 +335,17 @@ function handleMessage(ws: WebSocket, data: string): void {
           data: { room },
         });
         if (prevPhase === "questioning" && room.phase === "spy_voting") {
+          clearTurnTimer(room.id);
           broadcastToRoom(room.id, {
             type: "phase_changed",
             data: { phase: "spy_voting", room },
+          });
+        } else if (room.phase === "questioning" && room.currentTurnPlayerId) {
+          // Turn changed, restart timer
+          startTurnTimer(room.id);
+          broadcastToRoom(room.id, {
+            type: "turn_changed",
+            data: { currentPlayerId: room.currentTurnPlayerId, room },
           });
         }
       }
@@ -358,13 +467,14 @@ export async function registerRoutes(
       if (playerId) {
         const room = getRoomByPlayerId(playerId);
         const roomId = room?.id;
-        const updatedRoom = leaveRoom(playerId);
+        // Mark as disconnected instead of removing (for session persistence)
+        const updatedRoom = markPlayerDisconnected(playerId);
         clients.delete(playerId);
         playerConnections.delete(ws);
         if (roomId && updatedRoom) {
           broadcastToRoom(roomId, {
-            type: "player_left",
-            data: { playerId, room: updatedRoom },
+            type: "room_updated",
+            data: { room: updatedRoom },
           });
         }
       }

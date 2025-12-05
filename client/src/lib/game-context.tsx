@@ -1,5 +1,31 @@
-import { createContext, useContext, useCallback, useEffect, useState, type ReactNode } from "react";
+import { createContext, useContext, useCallback, useEffect, useState, useRef, type ReactNode } from "react";
 import type { Room, Player, ServerMessage, WebSocketMessage, GameMode, Message } from "@shared/schema";
+
+const SESSION_STORAGE_KEY = "spy_mastermind_session";
+
+interface SessionData {
+  sessionToken: string;
+  roomCode: string;
+  playerId: string;
+}
+
+function saveSession(data: SessionData): void {
+  localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(data));
+}
+
+function getSession(): SessionData | null {
+  const stored = localStorage.getItem(SESSION_STORAGE_KEY);
+  if (!stored) return null;
+  try {
+    return JSON.parse(stored);
+  } catch {
+    return null;
+  }
+}
+
+function clearSession(): void {
+  localStorage.removeItem(SESSION_STORAGE_KEY);
+}
 
 interface GameContextType {
   room: Room | null;
@@ -26,6 +52,7 @@ interface GameContextType {
   nextRound: () => void;
   leaveRoom: () => void;
   clearError: () => void;
+  doneWithQuestions: () => void;
 }
 
 const GameContext = createContext<GameContextType | null>(null);
@@ -37,6 +64,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
   const [isConnected, setIsConnected] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [timerRemaining, setTimerRemaining] = useState(0);
+  const reconnectAttempted = useRef(false);
 
   useEffect(() => {
     const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
@@ -46,6 +74,18 @@ export function GameProvider({ children }: { children: ReactNode }) {
     ws.onopen = () => {
       setIsConnected(true);
       setError(null);
+      
+      // Try to reconnect with saved session
+      if (!reconnectAttempted.current) {
+        reconnectAttempted.current = true;
+        const session = getSession();
+        if (session) {
+          ws.send(JSON.stringify({
+            type: "reconnect",
+            data: { sessionToken: session.sessionToken, roomCode: session.roomCode }
+          }));
+        }
+      }
     };
 
     ws.onclose = () => {
@@ -79,10 +119,25 @@ export function GameProvider({ children }: { children: ReactNode }) {
         setRoom(message.data.room);
         setPlayerId(message.data.playerId);
         setError(null);
+        // Save session for reconnection
+        saveSession({
+          sessionToken: message.data.sessionToken,
+          roomCode: message.data.room.id,
+          playerId: message.data.playerId,
+        });
+        break;
+      case "reconnected":
+        setRoom(message.data.room);
+        setPlayerId(message.data.playerId);
+        setError(null);
         break;
       case "room_updated":
       case "game_started":
       case "phase_changed":
+      case "turn_changed":
+        setRoom(message.data.room);
+        break;
+      case "spy_revealed":
         setRoom(message.data.room);
         break;
       case "player_left":
@@ -205,6 +260,11 @@ export function GameProvider({ children }: { children: ReactNode }) {
     sendMessage({ type: "leave_room" });
     setRoom(null);
     setPlayerId(null);
+    clearSession(); // Clear saved session on explicit leave
+  }, [sendMessage]);
+
+  const doneWithQuestions = useCallback(() => {
+    sendMessage({ type: "done_with_questions" });
   }, [sendMessage]);
 
   const clearError = useCallback(() => {
@@ -241,6 +301,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
         nextRound,
         leaveRoom,
         clearError,
+        doneWithQuestions,
       }}
     >
       {children}

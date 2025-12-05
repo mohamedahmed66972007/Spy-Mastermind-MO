@@ -1,24 +1,43 @@
-import { useState } from "react";
-import { MessageCircle, Send, Clock, User, CheckCircle } from "lucide-react";
+import { useState, useEffect } from "react";
+import { MessageCircle, Send, Clock, User, CheckCircle, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Progress } from "@/components/ui/progress";
 import { useGame } from "@/lib/game-context";
 
 export function QuestioningPhase() {
-  const { room, currentPlayer, playerId, askQuestion, answerQuestion, endTurn, timerRemaining } = useGame();
+  const { room, currentPlayer, playerId, askQuestion, answerQuestion, endTurn, timerRemaining, doneWithQuestions } = useGame();
   const [selectedTarget, setSelectedTarget] = useState<string | null>(null);
   const [question, setQuestion] = useState("");
   const [answer, setAnswer] = useState("");
+  const [localTimer, setLocalTimer] = useState(timerRemaining);
+
+  // Update local timer when server sends updates
+  useEffect(() => {
+    setLocalTimer(timerRemaining);
+  }, [timerRemaining]);
+
+  // Countdown timer
+  useEffect(() => {
+    if (localTimer <= 0) return;
+    const interval = setInterval(() => {
+      setLocalTimer((prev) => Math.max(0, prev - 1));
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [localTimer]);
 
   if (!room || !currentPlayer) return null;
 
-  const currentTurnPlayer = room.players[room.currentPlayerIndex];
-  const isMyTurn = currentTurnPlayer?.id === playerId;
-  const questionsRemaining = 3 - room.questionsAsked;
+  // Use currentTurnPlayerId for turn-based system
+  const currentTurnPlayerId = room.currentTurnPlayerId || room.players[room.currentPlayerIndex]?.id;
+  const currentTurnPlayer = room.players.find(p => p.id === currentTurnPlayerId);
+  const isMyTurn = currentTurnPlayerId === playerId;
+  const myQuestionsRemaining = currentPlayer.questionsRemaining ?? 3;
+  const amDoneWithQuestions = currentPlayer.doneWithQuestions ?? false;
   const lastQuestion = room.questions[room.questions.length - 1];
   const needsAnswer = lastQuestion && !lastQuestion.answer && lastQuestion.targetId === playerId;
 
@@ -55,9 +74,27 @@ export function QuestioningPhase() {
           </Badge>
           <Badge variant="outline" className="gap-1">
             <MessageCircle className="w-4 h-4" />
-            {questionsRemaining} أسئلة متبقية
+            {myQuestionsRemaining} أسئلة متبقية لك
           </Badge>
+          {amDoneWithQuestions && (
+            <Badge variant="secondary" className="gap-1 bg-green-100 text-green-800">
+              <CheckCircle className="w-4 h-4" />
+              أنهيت أسئلتك
+            </Badge>
+          )}
         </div>
+        {/* Timer display */}
+        {localTimer > 0 && (
+          <div className="mt-4">
+            <div className="flex items-center justify-center gap-2 mb-2">
+              <Clock className="w-5 h-5 text-primary" />
+              <span className="text-xl font-bold tabular-nums">
+                {Math.floor(localTimer / 60)}:{(localTimer % 60).toString().padStart(2, '0')}
+              </span>
+            </div>
+            <Progress value={(localTimer / 60) * 100} className="h-2 w-48 mx-auto" />
+          </div>
+        )}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -195,7 +232,7 @@ export function QuestioningPhase() {
                     />
                     <Button
                       onClick={handleAskQuestion}
-                      disabled={!question.trim() || questionsRemaining === 0}
+                      disabled={!question.trim() || myQuestionsRemaining === 0}
                       data-testid="button-send-question"
                     >
                       <Send className="w-4 h-4" />
@@ -203,27 +240,50 @@ export function QuestioningPhase() {
                   </div>
                 )}
 
-                <Button
-                  variant="secondary"
-                  className="w-full gap-2"
-                  onClick={endTurn}
-                  data-testid="button-end-turn"
-                >
-                  <CheckCircle className="w-4 h-4" />
-                  إنهاء الدور
-                </Button>
+                <div className="flex gap-2">
+                  <Button
+                    variant="secondary"
+                    className="flex-1 gap-2"
+                    onClick={endTurn}
+                    data-testid="button-end-turn"
+                  >
+                    <CheckCircle className="w-4 h-4" />
+                    انتقل للتالي
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="flex-1 gap-2"
+                    onClick={doneWithQuestions}
+                    disabled={amDoneWithQuestions}
+                    data-testid="button-done-questions"
+                  >
+                    <XCircle className="w-4 h-4" />
+                    انتهيت من الأسئلة
+                  </Button>
+                </div>
               </CardContent>
             </Card>
           ) : (
             <Card>
-              <CardContent className="p-8 text-center">
-                <Clock className="w-12 h-12 mx-auto mb-4 text-muted-foreground animate-pulse" />
+              <CardContent className="p-8 text-center space-y-4">
+                <Clock className="w-12 h-12 mx-auto text-muted-foreground animate-pulse" />
                 <p className="text-lg font-medium">
                   انتظر دورك...
                 </p>
                 <p className="text-muted-foreground">
                   دور {currentTurnPlayer?.name} الآن
                 </p>
+                {!amDoneWithQuestions && myQuestionsRemaining > 0 && (
+                  <Button
+                    variant="outline"
+                    className="gap-2"
+                    onClick={doneWithQuestions}
+                    data-testid="button-done-questions-waiting"
+                  >
+                    <XCircle className="w-4 h-4" />
+                    انتهيت من الأسئلة
+                  </Button>
+                )}
               </CardContent>
             </Card>
           )}
