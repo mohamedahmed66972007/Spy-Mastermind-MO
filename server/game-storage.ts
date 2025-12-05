@@ -551,27 +551,26 @@ function processGuessValidation(room: Room): void {
   const correctVotes = room.guessValidationVotes.filter((v) => v.isCorrect).length;
   const totalVotes = room.guessValidationVotes.length;
 
-  // If spy guessed correctly (more than half voted correct)
+  // Award points to players who voted for the spy (they caught the spy)
+  room.players.forEach((p) => {
+    if (p.role !== "spy") {
+      const votedForAnySpy = room.spyVotes.find((v) => {
+        if (v.voterId !== p.id) return false;
+        const suspect = room.players.find(player => player.id === v.suspectId);
+        return suspect?.role === "spy";
+      });
+      if (votedForAnySpy) {
+        p.score = (p.score || 0) + 1;
+      }
+    }
+  });
+
+  // If spy guessed correctly (more than half voted correct), spy also gets a point
   if (correctVotes > totalVotes / 2) {
-    // Award points to the spy
     room.revealedSpyIds.forEach((spyId) => {
       const spy = room.players.find((p) => p.id === spyId);
       if (spy) {
         spy.score = (spy.score || 0) + 1;
-      }
-    });
-  } else {
-    // Spy guessed wrong - award points to players who voted for the spy
-    room.players.forEach((p) => {
-      if (p.role !== "spy") {
-        const votedForAnySpy = room.spyVotes.find((v) => {
-          if (v.voterId !== p.id) return false;
-          const suspect = room.players.find(player => player.id === v.suspectId);
-          return suspect?.role === "spy";
-        });
-        if (votedForAnySpy) {
-          p.score = (p.score || 0) + 1;
-        }
       }
     });
   }

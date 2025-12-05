@@ -300,7 +300,7 @@ function startSpyGuessTimer(roomId: string): void {
   const timer = setTimeout(() => {
     const currentRoom = getRoom(roomId);
     if (currentRoom && currentRoom.phase === "spy_guess") {
-      // Time expired, spy didn't guess - award points to players who voted correctly
+      // Time expired, spy didn't guess - award points to players who voted for the spy
       currentRoom.players.forEach((p) => {
         if (p.role !== "spy") {
           const votedForAnySpy = currentRoom.spyVotes.find((v) => {
@@ -364,7 +364,21 @@ function forceProcessGuessValidation(roomId: string): void {
   const room = getRoom(roomId);
   if (!room || room.phase !== "guess_validation") return;
   
-  // Count votes - if more "correct" votes or tie, spy wins the point
+  // Award points to players who voted for the spy
+  room.players.forEach((p) => {
+    if (p.role !== "spy") {
+      const votedForAnySpy = room.spyVotes.find((v) => {
+        if (v.voterId !== p.id) return false;
+        const suspect = room.players.find(player => player.id === v.suspectId);
+        return suspect?.role === "spy";
+      });
+      if (votedForAnySpy) {
+        p.score = (p.score || 0) + 1;
+      }
+    }
+  });
+  
+  // Count votes - if more "correct" votes or tie, spy also wins a point
   const correctVotes = room.guessValidationVotes.filter(v => v.isCorrect).length;
   const incorrectVotes = room.guessValidationVotes.filter(v => !v.isCorrect).length;
   
@@ -373,20 +387,6 @@ function forceProcessGuessValidation(roomId: string): void {
     room.players.forEach(p => {
       if (room.revealedSpyIds.includes(p.id)) {
         p.score = (p.score || 0) + 1;
-      }
-    });
-  } else if (room.guessValidationVotes.length > 0) {
-    // Spy guessed wrong - award points to players who voted for the spy
-    room.players.forEach((p) => {
-      if (p.role !== "spy") {
-        const votedForAnySpy = room.spyVotes.find((v) => {
-          if (v.voterId !== p.id) return false;
-          const suspect = room.players.find(player => player.id === v.suspectId);
-          return suspect?.role === "spy";
-        });
-        if (votedForAnySpy) {
-          p.score = (p.score || 0) + 1;
-        }
       }
     });
   }
