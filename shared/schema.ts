@@ -2,6 +2,8 @@ import { z } from "zod";
 
 export type GameMode = "classic" | "blind";
 
+export type GuessValidationMode = "system" | "players";
+
 export type GamePhase = 
   | "lobby"
   | "category_voting"
@@ -81,6 +83,7 @@ export interface Room {
   turnQueue: string[];
   currentTurnPlayerId?: string;
   turnTimerEnd?: number;
+  guessValidationMode: GuessValidationMode;
 }
 
 export const categories = [
@@ -119,6 +122,7 @@ export type WebSocketMessage =
   | { type: "answer_question"; data: { answer: string } }
   | { type: "send_message"; data: { text: string } }
   | { type: "update_spy_count"; data: { count: number } }
+  | { type: "update_guess_validation_mode"; data: { mode: GuessValidationMode } }
   | { type: "next_round" }
   | { type: "leave_room" }
   | { type: "done_with_questions" }

@@ -1,4 +1,4 @@
-import type { Room, Player, GameMode, GamePhase, Message, Question, CategoryVote, SpyVote } from "@shared/schema";
+import type { Room, Player, GameMode, GamePhase, Message, Question, CategoryVote, SpyVote, GuessValidationMode } from "@shared/schema";
 import { getSpyCountForPlayers, categories } from "@shared/schema";
 import { getRandomWord, getDifferentWord } from "./words";
 import { randomUUID } from "crypto";
@@ -9,6 +9,50 @@ const sessionTokenToPlayer = new Map<string, { playerId: string; roomId: string 
 
 const QUESTIONS_PER_PLAYER = 3;
 const SESSION_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes
+
+function normalizeArabicWord(word: string): string {
+  let normalized = word.trim();
+  normalized = normalized.replace(/[\u064B-\u065F\u0670]/g, '');
+  normalized = normalized.replace(/\u0640/g, '');
+  normalized = normalized.replace(/\s+/g, ' ');
+  normalized = normalized.replace(/[.,،؛:!?؟\-_'"«»()[\]{}]/g, '');
+  normalized = normalized.replace(/^ال/, '');
+  normalized = normalized.replace(/ى/g, 'ي');
+  normalized = normalized.replace(/[أإآ]/g, 'ا');
+  normalized = normalized.replace(/ؤ/g, 'و');
+  normalized = normalized.replace(/ئ/g, 'ي');
+  return normalized.trim();
+}
+
+function isGuessCorrect(guess: string, actualWord: string): boolean {
+  return normalizeArabicWord(guess) === normalizeArabicWord(actualWord);
+}
+
+function processSystemGuessValidation(room: Room, guessIsCorrect: boolean): void {
+  room.players.forEach((p) => {
+    if (p.role !== "spy") {
+      const votedForAnySpy = room.spyVotes.find((v) => {
+        if (v.voterId !== p.id) return false;
+        const suspect = room.players.find(player => player.id === v.suspectId);
+        return suspect?.role === "spy";
+      });
+      if (votedForAnySpy) {
+        p.score = (p.score || 0) + 1;
+      }
+    }
+  });
+
+  if (guessIsCorrect) {
+    room.revealedSpyIds.forEach((spyId) => {
+      const spy = room.players.find((p) => p.id === spyId);
+      if (spy) {
+        spy.score = (spy.score || 0) + 1;
+      }
+    });
+  }
+
+  room.phase = "results";
+}
 
 function generateRoomId(): string {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -57,6 +101,7 @@ export function createRoom(playerName: string, gameMode: GameMode): { room: Room
     spyCount: 1,
     questionsPerPlayer: QUESTIONS_PER_PLAYER,
     turnQueue: [],
+    guessValidationMode: "system",
   };
 
   rooms.set(roomId, room);
@@ -169,6 +214,18 @@ export function updateSpyCount(playerId: string, count: number): Room | undefine
   if (!player?.isHost) return undefined;
 
   room.spyCount = Math.max(1, Math.min(count, Math.floor(room.players.length / 2)));
+  return room;
+}
+
+export function updateGuessValidationMode(playerId: string, mode: GuessValidationMode): Room | undefined {
+  const room = getRoomByPlayerId(playerId);
+  if (!room) return undefined;
+  
+  const player = room.players.find((p) => p.id === playerId);
+  if (!player?.isHost) return undefined;
+  if (room.phase !== "lobby") return undefined;
+
+  room.guessValidationMode = mode;
   return room;
 }
 
@@ -526,12 +583,18 @@ export function submitGuess(playerId: string, guess: string): Room | undefined {
   const player = room.players.find(p => p.id === playerId);
   if (!player) return undefined;
   
-  // Check if player is a revealed spy
   if (!room.revealedSpyIds.includes(playerId) || player.role !== "spy") return undefined;
 
   room.spyGuess = guess;
-  room.phase = "guess_validation";
   room.guessValidationVotes = [];
+  
+  if (room.guessValidationMode === "system") {
+    const actualWord = room.currentWord;
+    const guessIsCorrect = actualWord ? isGuessCorrect(guess, actualWord) : false;
+    processSystemGuessValidation(room, guessIsCorrect);
+  } else {
+    room.phase = "guess_validation";
+  }
 
   return room;
 }

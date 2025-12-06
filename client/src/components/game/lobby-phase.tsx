@@ -1,4 +1,4 @@
-import { Crown, Check, Clock, Play, Settings, Users, Minus, Plus } from "lucide-react";
+import { Crown, Check, Clock, Play, Settings, Users, Minus, Plus, Bot, UsersRound } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -7,7 +7,7 @@ import { useGame } from "@/lib/game-context";
 import { getMinPlayersForStart, getMaxPlayers, getSpyCountForPlayers } from "@shared/schema";
 
 export function LobbyPhase() {
-  const { room, currentPlayer, isHost, toggleReady, startGame, updateSpyCount } = useGame();
+  const { room, currentPlayer, isHost, toggleReady, startGame, updateSpyCount, updateGuessValidationMode } = useGame();
 
   if (!room || !currentPlayer) return null;
 
@@ -118,7 +118,7 @@ export function LobbyPhase() {
               إعدادات اللعبة
             </CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="space-y-4">
             <div className="flex items-center justify-between gap-4">
               <div>
                 <p className="font-medium">عدد الجواسيس</p>
@@ -147,6 +147,41 @@ export function LobbyPhase() {
                   data-testid="button-increase-spy"
                 >
                   <Plus className="w-4 h-4" />
+                </Button>
+              </div>
+            </div>
+
+            <Separator />
+
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <p className="font-medium">التحقق من تخمين الجاسوس</p>
+                <p className="text-sm text-muted-foreground">
+                  {room.guessValidationMode === "system" 
+                    ? "تلقائي: النظام يتحقق من صحة التخمين" 
+                    : "يدوي: اللاعبون يصوتون على صحة التخمين"}
+                </p>
+              </div>
+              <div className="flex items-center gap-1">
+                <Button
+                  size="sm"
+                  variant={room.guessValidationMode === "system" ? "default" : "outline"}
+                  onClick={() => updateGuessValidationMode("system")}
+                  className="gap-1"
+                  data-testid="button-validation-system"
+                >
+                  <Bot className="w-4 h-4" />
+                  تلقائي
+                </Button>
+                <Button
+                  size="sm"
+                  variant={room.guessValidationMode === "players" ? "default" : "outline"}
+                  onClick={() => updateGuessValidationMode("players")}
+                  className="gap-1"
+                  data-testid="button-validation-players"
+                >
+                  <UsersRound className="w-4 h-4" />
+                  يدوي
                 </Button>
               </div>
             </div>

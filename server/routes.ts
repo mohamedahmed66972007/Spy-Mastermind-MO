@@ -9,6 +9,7 @@ import {
   getRoomByPlayerId,
   togglePlayerReady,
   updateSpyCount,
+  updateGuessValidationMode,
   startGame,
   voteCategory,
   askQuestion,
@@ -498,6 +499,18 @@ function handleMessage(ws: WebSocket, data: string): void {
       break;
     }
 
+    case "update_guess_validation_mode": {
+      if (!playerId) return;
+      const room = updateGuessValidationMode(playerId, message.data.mode);
+      if (room) {
+        broadcastToRoom(room.id, {
+          type: "room_updated",
+          data: { room },
+        });
+      }
+      break;
+    }
+
     case "start_game": {
       if (!playerId) return;
       const room = startGame(playerId);
@@ -680,19 +693,24 @@ function handleMessage(ws: WebSocket, data: string): void {
       const prevPhase = getRoomByPlayerId(playerId)?.phase;
       const room = submitGuess(playerId, message.data.guess);
       if (room) {
-        // Clear the spy guess timer since the spy submitted their guess
         clearSpyGuessTimer(room.id);
         broadcastToRoom(room.id, {
           type: "room_updated",
           data: { room },
         });
-        if (prevPhase === "spy_guess" && room.phase === "guess_validation") {
-          broadcastToRoom(room.id, {
-            type: "phase_changed",
-            data: { phase: "guess_validation", room },
-          });
-          // Start guess validation timer
-          startGuessValidationTimer(room.id);
+        if (prevPhase === "spy_guess") {
+          if (room.phase === "guess_validation") {
+            broadcastToRoom(room.id, {
+              type: "phase_changed",
+              data: { phase: "guess_validation", room },
+            });
+            startGuessValidationTimer(room.id);
+          } else if (room.phase === "results") {
+            broadcastToRoom(room.id, {
+              type: "phase_changed",
+              data: { phase: "results", room },
+            });
+          }
         }
       }
       break;
