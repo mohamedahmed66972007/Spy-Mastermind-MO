@@ -19,7 +19,7 @@ export function WordRevealPhase() {
       if (room.selectedCategory === "countries") {
         categoryPrefix = "دولة ";
       } else if (room.selectedCategory === "fruits_vegetables") {
-        categoryPrefix = "فاكهة ";
+        categoryPrefix = "ثمرة ";
       } else if (room.selectedCategory === "animals") {
         categoryPrefix = "حيوان ";
       } else if (room.selectedCategory === "cars") {

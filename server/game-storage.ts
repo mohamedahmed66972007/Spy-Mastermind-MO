@@ -1,6 +1,6 @@
 import type { Room, Player, GameMode, GamePhase, Message, Question, CategoryVote, SpyVote, GuessValidationMode } from "@shared/schema";
 import { getSpyCountForPlayers, categories } from "@shared/schema";
-import { getRandomWord, getDifferentWord } from "./words";
+import { getRandomWord, getSimilarWord } from "./words";
 import { randomUUID } from "crypto";
 
 const rooms = new Map<string, Room>();
@@ -307,7 +307,7 @@ function selectCategoryAndStartWordReveal(room: Room): void {
   const spyIds = shuffledPlayers.slice(0, spyCount).map((p) => p.id);
 
   if (room.gameMode === "blind") {
-    room.spyWord = getDifferentWord(room.selectedCategory, room.currentWord);
+    room.spyWord = getSimilarWord(room.selectedCategory, room.currentWord);
   }
 
   room.players.forEach((player) => {
@@ -614,14 +614,11 @@ function processSpyVotes(room: Room): void {
 
   console.log(`processSpyVotes: Active votes: ${activeVotes.length} from ${activePlayers.length} players`);
 
-  // If no active votes at all, just move to results
-  if (activeVotes.length === 0) {
-    console.log(`processSpyVotes: No active votes, moving to results`);
-    room.phase = "results";
-    room.phaseStartTime = Date.now();
-    return;
-  }
+  // Get all spy IDs for this round
+  const allSpyIds = room.players.filter(p => p.role === "spy").map(p => p.id);
+  console.log(`processSpyVotes: All spies in room:`, allSpyIds);
 
+  // Count votes for each player
   const voteCounts = activePlayers.reduce((acc, player) => {
     acc[player.id] = activeVotes.filter((v) => v.suspectId === player.id).length;
     return acc;
@@ -632,48 +629,34 @@ function processSpyVotes(room: Room): void {
   const maxVotes = Math.max(...Object.values(voteCounts), 0);
   console.log(`processSpyVotes: Max votes: ${maxVotes}`);
 
-  // If no one got any votes (shouldn't happen but let's be safe)
-  if (maxVotes === 0) {
-    console.log(`processSpyVotes: No one got votes, moving to results`);
-    room.phase = "results";
-    room.phaseStartTime = Date.now();
-    return;
-  }
-
-  const topSuspects = Object.entries(voteCounts)
-    .filter(([_, count]) => count === maxVotes && count > 0)
-    .map(([id]) => id);
+  const topSuspects = maxVotes > 0 
+    ? Object.entries(voteCounts)
+        .filter(([_, count]) => count === maxVotes)
+        .map(([id]) => id)
+    : [];
 
   console.log(`processSpyVotes: Top suspects:`, topSuspects);
 
-  if (topSuspects.length === 0) {
-    console.log(`processSpyVotes: No top suspects, moving to results`);
-    room.phase = "results";
-    room.phaseStartTime = Date.now();
-    return;
-  }
-
-  // Check if any top suspect is actually a spy
-  const spyRevealed = topSuspects.some((suspectId) => {
+  // Check if any top suspect is actually a spy (spy was caught)
+  const spyCaught = topSuspects.some((suspectId) => {
     const suspect = room.players.find((p) => p.id === suspectId);
     return suspect?.role === "spy";
   });
 
-  console.log(`processSpyVotes: Spy revealed: ${spyRevealed}, top suspects: ${topSuspects}`);
+  console.log(`processSpyVotes: Spy caught by voting: ${spyCaught}`);
 
-  if (spyRevealed) {
-    room.revealedSpyIds = topSuspects.filter((id) => {
+  // Award points to non-spy players who voted correctly for a spy
+  if (spyCaught) {
+    const caughtSpyIds = topSuspects.filter((id) => {
       const suspect = room.players.find((p) => p.id === id);
       return suspect?.role === "spy";
     });
-    console.log(`processSpyVotes: Spy revealed (${room.players.find(p => room.revealedSpyIds.includes(p.id))?.name}), moving to spy_guess`);
-
-    // Award point to non-spy players who voted correctly for the spy
+    
     room.players.forEach((p) => {
       if (p.role !== "spy") {
         const votedForSpy = activeVotes.some(v => 
           v.voterId === p.id && 
-          room.revealedSpyIds.includes(v.suspectId)
+          caughtSpyIds.includes(v.suspectId)
         );
         if (votedForSpy) {
           p.score = (p.score || 0) + 1;
@@ -681,23 +664,16 @@ function processSpyVotes(room: Room): void {
         }
       }
     });
-
-    room.phase = "spy_guess";
-    room.phaseStartTime = Date.now();
-  } else {
-    console.log(`processSpyVotes: Spy not revealed, moving to results`);
-    // Wrong suspect - spies win, award points to spies who voted
-    room.players.forEach((p) => {
-      const voted = activeVotes.some(v => v.voterId === p.id);
-      if (p.role === "spy" && voted) {
-        p.score = (p.score || 0) + 1;
-        console.log(`processSpyVotes: Awarded point to spy ${p.name} (voted)`);
-      }
-    });
-    room.phase = "results";
-    room.phaseStartTime = Date.now();
   }
 
+  // ALWAYS move to spy_guess phase - spy gets a chance to guess the word
+  // Spy ONLY gets a point if they correctly guess the word
+  // Set revealedSpyIds to all spies so they can guess
+  room.revealedSpyIds = allSpyIds;
+  room.phase = "spy_guess";
+  room.phaseStartTime = Date.now();
+  
+  console.log(`processSpyVotes: Moving to spy_guess phase. Spies can now guess the word.`);
   console.log(`processSpyVotes: Final phase is ${room.phase}`);
 }
 
