@@ -47,18 +47,17 @@ function isGuessCorrect(guess: string, actualWord: string): boolean {
 function processSystemGuessValidation(room: Room, guessIsCorrect: boolean): void {
   room.spyGuessCorrect = guessIsCorrect;
 
-  // Points for voting correctly on the spy were already awarded in processSpyVotes
-  // Here we only handle the spy's guess result
-
-  // If spy guessed correctly, spy gets a point
   if (guessIsCorrect) {
-    room.revealedSpyIds.forEach((spyId) => {
-      const spy = room.players.find((p) => p.id === spyId);
-      if (spy) {
-        spy.score = (spy.score || 0) + 1;
+    // Spy guessed correctly - award point to spy
+    room.players.forEach(p => {
+      if (room.revealedSpyIds.includes(p.id)) {
+        p.score = (p.score || 0) + 1;
+        console.log(`processSystemGuessValidation: Awarded point to spy ${p.name} (guessed correctly)`);
       }
     });
   }
+  // If spy guessed incorrectly, no additional points are awarded
+  // Points were already awarded in processSpyVotes for voting correctly
 
   room.phase = "results";
   room.phaseStartTime = Date.now(); // Start timer for results phase
@@ -645,26 +644,20 @@ function processSpyVotes(room: Room): void {
 
   console.log(`processSpyVotes: Spy caught by voting: ${spyCaught}`);
 
-  // Award points to non-spy players who voted correctly for a spy
-  if (spyCaught) {
-    const caughtSpyIds = topSuspects.filter((id) => {
-      const suspect = room.players.find((p) => p.id === id);
-      return suspect?.role === "spy";
-    });
+  // Award points to players who voted for ANY spy (not just the one with most votes)
+  // This ensures players get 1 point for voting correctly, regardless of spy's guess
+  room.players.forEach((p) => {
+    const vote = activeVotes.find(v => v.voterId === p.id);
+    p.votedFor = vote?.suspectId;
     
-    room.players.forEach((p) => {
-      if (p.role !== "spy") {
-        const votedForSpy = activeVotes.some(v => 
-          v.voterId === p.id && 
-          caughtSpyIds.includes(v.suspectId)
-        );
-        if (votedForSpy) {
-          p.score = (p.score || 0) + 1;
-          console.log(`processSpyVotes: Awarded point to ${p.name} (voted correctly for spy)`);
-        }
+    if (p.role !== "spy" && vote) {
+      const votedPlayer = room.players.find(player => player.id === vote.suspectId);
+      if (votedPlayer?.role === "spy") {
+        p.score = (p.score || 0) + 1;
+        console.log(`processSpyVotes: Awarded point to ${p.name} (voted for spy ${votedPlayer.name})`);
       }
-    });
-  }
+    }
+  });
 
   // ALWAYS move to spy_guess phase - spy gets a chance to guess the word
   // Spy ONLY gets a point if they correctly guess the word
@@ -672,7 +665,7 @@ function processSpyVotes(room: Room): void {
   room.revealedSpyIds = allSpyIds;
   room.phase = "spy_guess";
   room.phaseStartTime = Date.now();
-  
+
   console.log(`processSpyVotes: Moving to spy_guess phase. Spies can now guess the word.`);
   console.log(`processSpyVotes: Final phase is ${room.phase}`);
 }
@@ -734,12 +727,17 @@ function processGuessValidation(room: Room): void {
 
   // If spy guessed correctly (more than half voted correct), spy also gets a point
   if (correctVotes > totalVotes / 2) {
+    room.spyGuessCorrect = true;
     room.revealedSpyIds.forEach((spyId) => {
       const spy = room.players.find((p) => p.id === spyId);
       if (spy) {
         spy.score = (spy.score || 0) + 1;
+        console.log(`processGuessValidation: Awarded point to spy ${spy.name} (validated as correct)`);
       }
     });
+  } else {
+    room.spyGuessCorrect = false;
+    // No additional points for non-spy players - already awarded in processSpyVotes
   }
 
   room.phase = "results";
