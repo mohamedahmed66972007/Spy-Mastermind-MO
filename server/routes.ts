@@ -107,7 +107,9 @@ function startWordRevealTimer(roomId: string): void {
 }
 
 const turnTimers = new Map<string, NodeJS.Timeout>();
+const turnIntervals = new Map<string, NodeJS.Timeout>();
 const answerTimers = new Map<string, NodeJS.Timeout>();
+const answerIntervals = new Map<string, NodeJS.Timeout>();
 const votingTimers = new Map<string, NodeJS.Timeout>();
 
 function clearTurnTimer(roomId: string): void {
@@ -116,6 +118,11 @@ function clearTurnTimer(roomId: string): void {
     clearTimeout(timer);
     turnTimers.delete(roomId);
   }
+  const interval = turnIntervals.get(roomId);
+  if (interval) {
+    clearInterval(interval);
+    turnIntervals.delete(roomId);
+  }
 }
 
 function clearAnswerTimer(roomId: string): void {
@@ -123,6 +130,11 @@ function clearAnswerTimer(roomId: string): void {
   if (timer) {
     clearTimeout(timer);
     answerTimers.delete(roomId);
+  }
+  const interval = answerIntervals.get(roomId);
+  if (interval) {
+    clearInterval(interval);
+    answerIntervals.delete(roomId);
   }
 }
 
@@ -142,13 +154,45 @@ function startAnswerTimer(roomId: string): void {
   if (!room || room.phase !== "questioning") return;
   
   const ANSWER_DURATION = 30000; // 30 seconds
+  const answerStartTime = Date.now();
   
-  broadcastToRoom(roomId, {
-    type: "timer_update",
-    data: { timeRemaining: Math.ceil(ANSWER_DURATION / 1000) },
-  });
+  // Function to broadcast timer update
+  const broadcastTimer = () => {
+    const currentRoom = getRoom(roomId);
+    if (!currentRoom || currentRoom.phase !== "questioning") {
+      const interval = answerIntervals.get(roomId);
+      if (interval) clearInterval(interval);
+      return;
+    }
+    
+    const elapsed = Date.now() - answerStartTime;
+    const remaining = Math.max(0, Math.ceil((ANSWER_DURATION - elapsed) / 1000));
+    
+    broadcastToRoom(roomId, {
+      type: "timer_update",
+      data: { timeRemaining: remaining },
+    });
+    
+    if (remaining === 0) {
+      const interval = answerIntervals.get(roomId);
+      if (interval) clearInterval(interval);
+    }
+  };
+  
+  // Broadcast initial timer
+  broadcastTimer();
+  
+  // Countdown interval - broadcast every second
+  const countdownInterval = setInterval(() => {
+    broadcastTimer();
+  }, 1000);
+  answerIntervals.set(roomId, countdownInterval);
   
   const timer = setTimeout(() => {
+    const interval = answerIntervals.get(roomId);
+    if (interval) clearInterval(interval);
+    answerIntervals.delete(roomId);
+    
     const currentRoom = getRoom(roomId);
     if (currentRoom && currentRoom.phase === "questioning") {
       // Time expired for answering, use forceEndAnsweringPhase to properly advance turn
@@ -192,12 +236,46 @@ function startTurnTimer(roomId: string, forceReset: boolean = true): void {
     timeRemaining = room.turnTimerEnd - Date.now();
   }
   
-  broadcastToRoom(roomId, {
-    type: "timer_update",
-    data: { timeRemaining: Math.ceil(timeRemaining / 1000) },
-  });
+  const turnStartTime = Date.now();
+  const initialTimeRemaining = timeRemaining;
+  
+  // Function to broadcast timer update
+  const broadcastTimer = () => {
+    const currentRoom = getRoom(roomId);
+    if (!currentRoom || currentRoom.phase !== "questioning") {
+      const interval = turnIntervals.get(roomId);
+      if (interval) clearInterval(interval);
+      return;
+    }
+    
+    const elapsed = Date.now() - turnStartTime;
+    const remaining = Math.max(0, Math.ceil((initialTimeRemaining - elapsed) / 1000));
+    
+    broadcastToRoom(roomId, {
+      type: "timer_update",
+      data: { timeRemaining: remaining },
+    });
+    
+    if (remaining === 0) {
+      const interval = turnIntervals.get(roomId);
+      if (interval) clearInterval(interval);
+    }
+  };
+  
+  // Broadcast initial timer
+  broadcastTimer();
+  
+  // Countdown interval - broadcast every second
+  const countdownInterval = setInterval(() => {
+    broadcastTimer();
+  }, 1000);
+  turnIntervals.set(roomId, countdownInterval);
   
   const timer = setTimeout(() => {
+    const interval = turnIntervals.get(roomId);
+    if (interval) clearInterval(interval);
+    turnIntervals.delete(roomId);
+    
     const currentRoom = getRoom(roomId);
     if (currentRoom && currentRoom.phase === "questioning" && currentRoom.currentTurnPlayerId) {
       // Use forceEndAskingPhase which deducts a question from the player
@@ -232,12 +310,45 @@ function startCategoryVotingTimer(roomId: string): void {
   
   const CATEGORY_VOTING_DURATION = 30000; // 30 seconds
   
-  broadcastToRoom(roomId, {
-    type: "timer_update",
-    data: { timeRemaining: Math.ceil(CATEGORY_VOTING_DURATION / 1000) },
-  });
+  // Set phase start time
+  room.phaseStartTime = Date.now();
+  
+  let countdownInterval: NodeJS.Timeout;
+  
+  // Function to broadcast timer update
+  const broadcastTimer = () => {
+    const currentRoom = getRoom(roomId);
+    if (!currentRoom || currentRoom.phase !== "category_voting") {
+      if (countdownInterval) clearInterval(countdownInterval);
+      return false;
+    }
+    
+    const elapsed = Date.now() - (currentRoom.phaseStartTime || Date.now());
+    const remaining = Math.max(0, Math.ceil((CATEGORY_VOTING_DURATION - elapsed) / 1000));
+    
+    broadcastToRoom(roomId, {
+      type: "timer_update",
+      data: { timeRemaining: remaining },
+    });
+    
+    if (remaining === 0) {
+      if (countdownInterval) clearInterval(countdownInterval);
+      return false;
+    }
+    
+    return true;
+  };
+  
+  // Broadcast initial timer
+  broadcastTimer();
+  
+  // Countdown interval - broadcast every second
+  countdownInterval = setInterval(() => {
+    broadcastTimer();
+  }, 1000);
   
   const timer = setTimeout(() => {
+    if (countdownInterval) clearInterval(countdownInterval);
     const currentRoom = getRoom(roomId);
     if (currentRoom && currentRoom.phase === "category_voting") {
       // Force move to word reveal phase even if not all voted
