@@ -46,20 +46,18 @@ function isGuessCorrect(guess: string, actualWord: string): boolean {
 
 function processSystemGuessValidation(room: Room, guessIsCorrect: boolean): void {
   room.spyGuessCorrect = guessIsCorrect;
-  
+
+  // Award points to players who voted for the spy
   room.players.forEach((p) => {
     if (p.role !== "spy") {
-      const votedForAnySpy = room.spyVotes.find((v) => {
-        if (v.voterId !== p.id) return false;
-        const suspect = room.players.find(player => player.id === v.suspectId);
-        return suspect?.role === "spy";
-      });
-      if (votedForAnySpy) {
+      const votedForSpy = room.spyVotes.some(v => v.voterId === p.id && room.players.find(player => player.id === v.suspectId)?.role === "spy");
+      if (votedForSpy) {
         p.score = (p.score || 0) + 1;
       }
     }
   });
 
+  // If spy guessed correctly, spy gets a point
   if (guessIsCorrect) {
     room.revealedSpyIds.forEach((spyId) => {
       const spy = room.players.find((p) => p.id === spyId);
@@ -70,6 +68,7 @@ function processSystemGuessValidation(room: Room, guessIsCorrect: boolean): void
   }
 
   room.phase = "results";
+  room.phaseStartTime = Date.now(); // Start timer for results phase
 }
 
 function generateRoomId(): string {
@@ -89,7 +88,7 @@ export function createRoom(playerName: string, gameMode: GameMode): { room: Room
   const roomId = generateRoomId();
   const playerId = randomUUID();
   const sessionToken = generateSessionToken();
-  
+
   const player: Player = {
     id: playerId,
     name: playerName,
@@ -197,7 +196,7 @@ export function markPlayerDisconnected(playerId: string): Room | undefined {
 export function isPlayerDisconnected(playerId: string): boolean {
   const room = getRoomByPlayerId(playerId);
   if (!room) return true;
-  
+
   const player = room.players.find(p => p.id === playerId);
   return player?.disconnectedAt !== undefined;
 }
@@ -227,7 +226,7 @@ export function togglePlayerReady(playerId: string): Room | undefined {
 export function updateSpyCount(playerId: string, count: number): Room | undefined {
   const room = getRoomByPlayerId(playerId);
   if (!room) return undefined;
-  
+
   const player = room.players.find((p) => p.id === playerId);
   if (!player?.isHost) return undefined;
 
@@ -238,7 +237,7 @@ export function updateSpyCount(playerId: string, count: number): Room | undefine
 export function updateGuessValidationMode(playerId: string, mode: GuessValidationMode): Room | undefined {
   const room = getRoomByPlayerId(playerId);
   if (!room) return undefined;
-  
+
   const player = room.players.find((p) => p.id === playerId);
   if (!player?.isHost) return undefined;
   if (room.phase !== "lobby") return undefined;
@@ -259,6 +258,7 @@ export function startGame(playerId: string): Room | undefined {
   if (!allReady) return undefined;
 
   room.phase = "category_voting";
+  room.phaseStartTime = Date.now(); // Start timer for category voting phase
   room.categoryVotes = [];
 
   return room;
@@ -285,7 +285,7 @@ export function forceSelectCategoryAndStartWordReveal(roomId: string): Room | un
   const room = rooms.get(roomId);
   if (!room) return undefined;
   if (room.phase !== "category_voting") return undefined;
-  
+
   selectCategoryAndStartWordReveal(room);
   return room;
 }
@@ -335,6 +335,7 @@ function selectCategoryAndStartWordReveal(room: Room): void {
   });
 
   room.phase = "word_reveal";
+  room.phaseStartTime = Date.now(); // Start timer for word reveal phase
   room.revealedSpyIds = [];
   room.spyVotes = [];
   room.questions = [];
@@ -346,7 +347,7 @@ function selectCategoryAndStartWordReveal(room: Room): void {
   // Initialize turn queue with all players in random order
   room.turnQueue = [...room.players].sort(() => Math.random() - 0.5).map(p => p.id);
   room.currentTurnPlayerId = room.turnQueue[0];
-  room.turnTimerEnd = undefined;
+  room.turnTimerEnd = undefined; // Timer will be set when questioning starts
 }
 
 export function askQuestion(playerId: string, targetId: string, question: string): Room | undefined {
@@ -372,6 +373,11 @@ export function askQuestion(playerId: string, targetId: string, question: string
   player.questionsRemaining = (player.questionsRemaining || QUESTIONS_PER_PLAYER) - 1;
   room.questionsAsked++;
 
+  // Ensure the timer is set for the current turn
+  if (room.turnTimerEnd === undefined) {
+    room.turnTimerEnd = Date.now() + 60000; // 1 minute timer
+  }
+
   return room;
 }
 
@@ -384,14 +390,19 @@ export function answerQuestion(playerId: string, answer: string): { room: Room; 
   if (!lastQuestion || lastQuestion.targetId !== playerId || lastQuestion.answer) return undefined;
 
   lastQuestion.answer = answer;
-  
+
   // After answering, automatically advance to next player's turn
   const previousTurnPlayerId = room.currentTurnPlayerId;
   const previousPhase = room.phase;
   advanceToNextTurn(room);
-  // Check if turn changed or phase changed to spy_voting
   const turnAdvanced = room.currentTurnPlayerId !== previousTurnPlayerId || room.phase !== previousPhase;
-  
+
+  // If the phase has changed to spy_voting, reset the timer
+  if (room.phase === "spy_voting") {
+    room.turnTimerEnd = undefined; // Reset timer for spy voting
+    room.phaseStartTime = Date.now(); // Start timer for spy voting phase
+  }
+
   return { room, turnAdvanced };
 }
 
@@ -422,15 +433,20 @@ export function forceEndAskingPhase(roomId: string): Room | undefined {
     currentPlayer.questionsRemaining--;
   }
 
-  // Clear any pending question that wasn't answered
+  // Mark the last question as unanswered if it exists and wasn't answered
   const lastQuestion = room.questions[room.questions.length - 1];
   if (lastQuestion && !lastQuestion.answer) {
-    // Remove the unanswered question or mark it as skipped
     lastQuestion.answer = "(لم يتم الإجابة)";
   }
 
   // Move to next player in turn queue
   advanceToNextTurn(room);
+
+  // If the phase has changed to spy_voting, reset the timer
+  if (room.phase === "spy_voting") {
+    room.turnTimerEnd = undefined; // Reset timer for spy voting
+    room.phaseStartTime = Date.now(); // Start timer for spy voting phase
+  }
 
   return room;
 }
@@ -450,6 +466,12 @@ export function forceEndAnsweringPhase(roomId: string): Room | undefined {
   // Move to next player in turn queue
   advanceToNextTurn(room);
 
+  // If the phase has changed to spy_voting, reset the timer
+  if (room.phase === "spy_voting") {
+    room.turnTimerEnd = undefined; // Reset timer for spy voting
+    room.phaseStartTime = Date.now(); // Start timer for spy voting phase
+  }
+
   return room;
 }
 
@@ -468,45 +490,54 @@ export function markDoneWithQuestions(playerId: string): Room | undefined {
     advanceToNextTurn(room);
   }
 
+  // If all players are done, transition to spy voting
+  if (checkAllPlayersDoneWithQuestions(room) && room.phase === "questioning") {
+    room.phase = "spy_voting";
+    room.phaseStartTime = Date.now(); // Start timer for spy voting phase
+    room.currentTurnPlayerId = undefined;
+    room.turnTimerEnd = undefined;
+  }
+
   return room;
 }
 
 function advanceToNextTurn(room: Room): void {
   // Find the current player's position in the queue
   const currentIndex = room.turnQueue.indexOf(room.currentTurnPlayerId || "");
-  
+
   // Look for next eligible player (starting from next position)
   let attempts = 0;
   let nextIndex = (currentIndex + 1) % room.turnQueue.length;
-  
+
   while (attempts < room.turnQueue.length) {
     const nextPlayerId = room.turnQueue[nextIndex];
     const nextPlayer = room.players.find(p => p.id === nextPlayerId);
-    
+
     // Check if player is eligible (has questions and not done)
-    if (nextPlayer && 
-        !nextPlayer.doneWithQuestions && 
+    if (nextPlayer &&
+        !nextPlayer.doneWithQuestions &&
         (nextPlayer.questionsRemaining === undefined || nextPlayer.questionsRemaining > 0)) {
       room.currentTurnPlayerId = nextPlayerId;
       room.currentPlayerIndex = room.players.findIndex(p => p.id === nextPlayerId);
       room.turnTimerEnd = Date.now() + 60000; // 1 minute timer
       return;
     }
-    
+
     nextIndex = (nextIndex + 1) % room.turnQueue.length;
     attempts++;
   }
-  
+
   // No more eligible players, move to spy voting
   room.phase = "spy_voting";
+  room.phaseStartTime = Date.now(); // Start timer for spy voting phase
   room.spyVotes = [];
   room.currentTurnPlayerId = undefined;
   room.turnTimerEnd = undefined;
 }
 
 export function checkAllPlayersDoneWithQuestions(room: Room): boolean {
-  return room.players.every(p => 
-    p.doneWithQuestions || 
+  return room.players.every(p =>
+    p.doneWithQuestions ||
     (p.questionsRemaining !== undefined && p.questionsRemaining <= 0)
   );
 }
@@ -524,6 +555,7 @@ export function voteSpy(playerId: string, suspectId: string): Room | undefined {
 
   room.spyVotes.push({ voterId: playerId, suspectId });
 
+  // Check if all players have voted. If so, process votes.
   if (room.spyVotes.length === room.players.length) {
     processSpyVotes(room);
   }
@@ -535,13 +567,14 @@ export function forceProcessSpyVotes(roomId: string): Room | undefined {
   const room = rooms.get(roomId);
   if (!room) return undefined;
   if (room.phase !== "spy_voting") return undefined;
-  
+
   // If no one voted, skip to results
   if (room.spyVotes.length === 0) {
     room.phase = "results";
+    room.phaseStartTime = Date.now(); // Start timer for results phase
     return room;
   }
-  
+
   processSpyVotes(room);
   return room;
 }
@@ -563,13 +596,13 @@ function processSpyVotes(room: Room): void {
     const player = room.players.find(p => p.id === id);
     return player?.role === "spy";
   });
-  
+
   if (spyInTopSuspects) {
     revealedId = spyInTopSuspects;
   } else {
     revealedId = topSuspects[Math.floor(Math.random() * topSuspects.length)];
   }
-  
+
   // Add to revealed spies list instead of replacing
   if (!room.revealedSpyIds.includes(revealedId)) {
     room.revealedSpyIds.push(revealedId);
@@ -579,14 +612,16 @@ function processSpyVotes(room: Room): void {
   const isSpy = revealedPlayer?.role === "spy";
 
   if (isSpy) {
-    // Don't award points yet - wait until after spy guess validation
-    // Move to spy guess phase
+    // Spy is revealed, move to spy guess phase
     room.phase = "spy_guess";
+    room.phaseStartTime = Date.now(); // Start timer for spy guess phase
+    // Ensure the spy guess phase timer is set
+    room.turnTimerEnd = Date.now() + 30000; // 30 seconds for spy guess
   } else {
-    // Spy does NOT get points when players vote wrong
-    // Only spy guessing the word correctly gives spy points
-    // Move to results with no spy points
+    // Spy was not revealed, move to results phase directly
+    // No points awarded to spy for players voting wrong.
     room.phase = "results";
+    room.phaseStartTime = Date.now(); // Start timer for results phase
   }
 }
 
@@ -594,21 +629,24 @@ export function submitGuess(playerId: string, guess: string): Room | undefined {
   const room = getRoomByPlayerId(playerId);
   if (!room) return undefined;
   if (room.phase !== "spy_guess") return undefined;
-  
+
   const player = room.players.find(p => p.id === playerId);
   if (!player) return undefined;
-  
+
+  // Only the spy can submit a guess
   if (!room.revealedSpyIds.includes(playerId) || player.role !== "spy") return undefined;
 
   room.spyGuess = guess;
   room.guessValidationVotes = [];
-  
+
   if (room.guessValidationMode === "system") {
     const actualWord = room.currentWord;
     const guessIsCorrect = actualWord ? isGuessCorrect(guess, actualWord) : false;
     processSystemGuessValidation(room, guessIsCorrect);
   } else {
     room.phase = "guess_validation";
+    room.phaseStartTime = Date.now(); // Start timer for guess validation phase
+    // Timer will be managed by the client for validation votes
   }
 
   return room;
@@ -618,6 +656,7 @@ export function validateGuess(playerId: string, isCorrect: boolean): Room | unde
   const room = getRoomByPlayerId(playerId);
   if (!room) return undefined;
   if (room.phase !== "guess_validation") return undefined;
+  // Only non-spy players can validate
   if (room.revealedSpyIds.includes(playerId)) return undefined;
 
   const existingVote = room.guessValidationVotes.find((v) => v.playerId === playerId);
@@ -626,6 +665,7 @@ export function validateGuess(playerId: string, isCorrect: boolean): Room | unde
   room.guessValidationVotes.push({ playerId, isCorrect });
 
   const nonSpyPlayers = room.players.filter((p) => !room.revealedSpyIds.includes(p.id));
+  // Check if all non-spy players have voted
   if (room.guessValidationVotes.length === nonSpyPlayers.length) {
     processGuessValidation(room);
   }
@@ -637,15 +677,11 @@ function processGuessValidation(room: Room): void {
   const correctVotes = room.guessValidationVotes.filter((v) => v.isCorrect).length;
   const totalVotes = room.guessValidationVotes.length;
 
-  // Award points to players who voted for the spy (they caught the spy)
+  // Award points to players who correctly identified the spy during the spy voting phase
   room.players.forEach((p) => {
     if (p.role !== "spy") {
-      const votedForAnySpy = room.spyVotes.find((v) => {
-        if (v.voterId !== p.id) return false;
-        const suspect = room.players.find(player => player.id === v.suspectId);
-        return suspect?.role === "spy";
-      });
-      if (votedForAnySpy) {
+      const votedForSpy = room.spyVotes.some(v => v.voterId === p.id && room.players.find(player => player.id === v.suspectId)?.role === "spy");
+      if (votedForSpy) {
         p.score = (p.score || 0) + 1;
       }
     }
@@ -662,6 +698,7 @@ function processGuessValidation(room: Room): void {
   }
 
   room.phase = "results";
+  room.phaseStartTime = Date.now(); // Start timer for results phase
 }
 
 export function nextRound(playerId: string): Room | undefined {
@@ -674,6 +711,7 @@ export function nextRound(playerId: string): Room | undefined {
 
   room.roundNumber++;
   room.phase = "category_voting";
+  room.phaseStartTime = Date.now(); // Start timer for category voting phase
   room.categoryVotes = [];
   room.spyVotes = [];
   room.questions = [];
@@ -709,6 +747,8 @@ export function startQuestioningPhase(roomId: string): Room | undefined {
   if (room.phase !== "word_reveal") return undefined;
 
   room.phase = "questioning";
+  room.phaseStartTime = Date.now(); // Start timer for questioning phase
+
   // Use the already randomized turn queue from word reveal phase
   // If turnQueue is empty (shouldn't happen), create a new randomized one
   if (room.turnQueue.length === 0) {

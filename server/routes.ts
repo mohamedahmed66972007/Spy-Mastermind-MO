@@ -238,7 +238,24 @@ function startSpyVotingTimer(roomId: string): void {
     data: { timeRemaining: Math.ceil(SPY_VOTING_DURATION / 1000) },
   });
   
+  const countdownInterval = setInterval(() => {
+    const currentRoom = getRoom(roomId);
+    if (!currentRoom || currentRoom.phase !== "spy_voting") {
+      clearInterval(countdownInterval);
+      return;
+    }
+    
+    const elapsed = Date.now() - (currentRoom.phaseStartTime || Date.now());
+    const remaining = Math.max(0, Math.ceil((SPY_VOTING_DURATION - elapsed) / 1000));
+    
+    broadcastToRoom(roomId, {
+      type: "timer_update",
+      data: { timeRemaining: remaining },
+    });
+  }, 1000);
+  
   const timer = setTimeout(() => {
+    clearInterval(countdownInterval);
     const currentRoom = getRoom(roomId);
     if (currentRoom && currentRoom.phase === "spy_voting") {
       // Force move to next phase even if not all voted
@@ -264,9 +281,14 @@ function forceEndCategoryVoting(roomId: string): void {
 function forceEndSpyVoting(roomId: string): void {
   const room = forceProcessSpyVotes(roomId);
   if (room) {
+    room.phaseStartTime = Date.now();
     broadcastToRoom(roomId, {
       type: "phase_changed",
       data: { phase: room.phase, room },
+    });
+    broadcastToRoom(roomId, {
+      type: "room_updated",
+      data: { room },
     });
     // Start spy guess timer if we're in spy_guess phase
     if (room.phase === "spy_guess") {
@@ -292,28 +314,36 @@ function startSpyGuessTimer(roomId: string): void {
   if (!room || room.phase !== "spy_guess") return;
   
   const SPY_GUESS_DURATION = 120000; // 120 seconds (2 minutes) for spy to guess
+  room.phaseStartTime = Date.now();
   
   broadcastToRoom(roomId, {
     type: "timer_update",
     data: { timeRemaining: Math.ceil(SPY_GUESS_DURATION / 1000) },
   });
   
+  const countdownInterval = setInterval(() => {
+    const currentRoom = getRoom(roomId);
+    if (!currentRoom || currentRoom.phase !== "spy_guess") {
+      clearInterval(countdownInterval);
+      return;
+    }
+    
+    const elapsed = Date.now() - (currentRoom.phaseStartTime || Date.now());
+    const remaining = Math.max(0, Math.ceil((SPY_GUESS_DURATION - elapsed) / 1000));
+    
+    broadcastToRoom(roomId, {
+      type: "timer_update",
+      data: { timeRemaining: remaining },
+    });
+  }, 1000);
+  
   const timer = setTimeout(() => {
+    clearInterval(countdownInterval);
     const currentRoom = getRoom(roomId);
     if (currentRoom && currentRoom.phase === "spy_guess") {
-      // Time expired, spy didn't guess - award points to players who voted for the spy
-      currentRoom.players.forEach((p) => {
-        if (p.role !== "spy") {
-          const votedForAnySpy = currentRoom.spyVotes.find((v) => {
-            if (v.voterId !== p.id) return false;
-            const suspect = currentRoom.players.find(player => player.id === v.suspectId);
-            return suspect?.role === "spy";
-          });
-          if (votedForAnySpy) {
-            p.score = (p.score || 0) + 1;
-          }
-        }
-      });
+      // انتهى الوقت - الجاسوس لم يخمن
+      // النقاط للاعبين تم منحها بالفعل في processSpyVotes
+      // الجاسوس لا يحصل على نقطة
       currentRoom.phase = "results";
       broadcastToRoom(roomId, {
         type: "phase_changed",
@@ -365,19 +395,8 @@ function forceProcessGuessValidation(roomId: string): void {
   const room = getRoom(roomId);
   if (!room || room.phase !== "guess_validation") return;
   
-  // Award points to players who voted for the spy
-  room.players.forEach((p) => {
-    if (p.role !== "spy") {
-      const votedForAnySpy = room.spyVotes.find((v) => {
-        if (v.voterId !== p.id) return false;
-        const suspect = room.players.find(player => player.id === v.suspectId);
-        return suspect?.role === "spy";
-      });
-      if (votedForAnySpy) {
-        p.score = (p.score || 0) + 1;
-      }
-    }
-  });
+  // النقاط للاعبين تم منحها بالفعل في processSpyVotes
+  // لا نمنحها مرة أخرى هنا
   
   // Count votes - if more "correct" votes or tie, spy also wins a point
   const correctVotes = room.guessValidationVotes.filter(v => v.isCorrect).length;

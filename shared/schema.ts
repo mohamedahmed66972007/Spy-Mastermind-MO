@@ -85,6 +85,7 @@ export interface Room {
   currentTurnPlayerId?: string;
   turnTimerEnd?: number;
   guessValidationMode: GuessValidationMode;
+  phaseStartTime?: number;
 }
 
 export const categories = [
