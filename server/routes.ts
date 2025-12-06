@@ -240,23 +240,21 @@ function startSpyVotingTimer(roomId: string): void {
   // Set phase start time
   room.phaseStartTime = Date.now();
   
-  // Broadcast initial timer
-  broadcastToRoom(roomId, {
-    type: "timer_update",
-    data: { timeRemaining: 30 },
-  });
+  let countdownInterval: NodeJS.Timeout;
   
-  // Countdown interval - broadcast every second
-  const countdownInterval = setInterval(() => {
+  // Function to broadcast timer update
+  const broadcastTimer = () => {
     const currentRoom = getRoom(roomId);
     if (!currentRoom || currentRoom.phase !== "spy_voting") {
       console.log(`startSpyVotingTimer: Clearing interval - phase changed`);
-      clearInterval(countdownInterval);
-      return;
+      if (countdownInterval) clearInterval(countdownInterval);
+      return false;
     }
     
     const elapsed = Date.now() - (currentRoom.phaseStartTime || Date.now());
     const remaining = Math.max(0, Math.ceil((SPY_VOTING_DURATION - elapsed) / 1000));
+    
+    console.log(`startSpyVotingTimer: Broadcasting remaining=${remaining}s`);
     
     broadcastToRoom(roomId, {
       type: "timer_update",
@@ -265,13 +263,24 @@ function startSpyVotingTimer(roomId: string): void {
     
     // Clear interval when time is up
     if (remaining === 0) {
-      clearInterval(countdownInterval);
+      if (countdownInterval) clearInterval(countdownInterval);
+      return false;
     }
+    
+    return true;
+  };
+  
+  // Broadcast initial timer
+  broadcastTimer();
+  
+  // Countdown interval - broadcast every second
+  countdownInterval = setInterval(() => {
+    broadcastTimer();
   }, 1000);
   
   const timer = setTimeout(() => {
     console.log(`startSpyVotingTimer: Timer expired for room ${roomId}`);
-    clearInterval(countdownInterval);
+    if (countdownInterval) clearInterval(countdownInterval);
     const currentRoom = getRoom(roomId);
     if (currentRoom && currentRoom.phase === "spy_voting") {
       console.log(`startSpyVotingTimer: Forcing end of spy voting`);
@@ -356,16 +365,13 @@ function startSpyGuessTimer(roomId: string): void {
   const SPY_GUESS_DURATION = 30000; // 30 seconds for spy to guess
   room.phaseStartTime = Date.now();
   
-  broadcastToRoom(roomId, {
-    type: "timer_update",
-    data: { timeRemaining: Math.ceil(SPY_GUESS_DURATION / 1000) },
-  });
+  let countdownInterval: NodeJS.Timeout;
   
-  const countdownInterval = setInterval(() => {
+  const broadcastTimer = () => {
     const currentRoom = getRoom(roomId);
     if (!currentRoom || currentRoom.phase !== "spy_guess") {
-      clearInterval(countdownInterval);
-      return;
+      if (countdownInterval) clearInterval(countdownInterval);
+      return false;
     }
     
     const elapsed = Date.now() - (currentRoom.phaseStartTime || Date.now());
@@ -375,10 +381,24 @@ function startSpyGuessTimer(roomId: string): void {
       type: "timer_update",
       data: { timeRemaining: remaining },
     });
+    
+    if (remaining === 0) {
+      if (countdownInterval) clearInterval(countdownInterval);
+      return false;
+    }
+    
+    return true;
+  };
+  
+  // Broadcast initial timer
+  broadcastTimer();
+  
+  countdownInterval = setInterval(() => {
+    broadcastTimer();
   }, 1000);
   
   const timer = setTimeout(() => {
-    clearInterval(countdownInterval);
+    if (countdownInterval) clearInterval(countdownInterval);
     const currentRoom = getRoom(roomId);
     if (currentRoom && currentRoom.phase === "spy_guess") {
       // انتهى الوقت - الجاسوس لم يخمن
