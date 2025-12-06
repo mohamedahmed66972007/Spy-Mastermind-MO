@@ -19,6 +19,11 @@ export function SpyVotingPhase() {
   // Always use server's timerRemaining directly - it's synced every second
   const displayTimer = timerRemaining;
 
+  // Debug logging
+  useEffect(() => {
+    console.log(`SpyVotingPhase: timerRemaining=${timerRemaining}, phase=${room?.phase}`);
+  }, [timerRemaining, room?.phase]);
+
   // Play warning sound when timer reaches 10 seconds
   useEffect(() => {
     if (displayTimer === 10 && !playedWarning.current) {

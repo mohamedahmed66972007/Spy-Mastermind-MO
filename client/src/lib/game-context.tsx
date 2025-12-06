@@ -75,7 +75,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
     ws.onopen = () => {
       setIsConnected(true);
       setError(null);
-      
+
       // Try to reconnect with saved session
       if (!reconnectAttempted.current) {
         reconnectAttempted.current = true;
@@ -145,6 +145,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
         setRoom(message.data.room);
         break;
       case "timer_update":
+        console.log(`Timer update received: ${message.data.timeRemaining}s`);
         setTimerRemaining(message.data.timeRemaining);
         break;
       case "new_message":

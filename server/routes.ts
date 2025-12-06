@@ -414,7 +414,18 @@ function startSpyVotingTimer(roomId: string): void {
     if (currentRoom && currentRoom.phase === "spy_voting") {
       console.log(`startSpyVotingTimer: Forcing end of spy voting`);
       // Force move to next phase even if not all voted
-      forceEndSpyVoting(roomId);
+      const updatedRoom = forceProcessSpyVotes(roomId);
+      if (updatedRoom) {
+        console.log(`startSpyVotingTimer: Successfully moved to phase ${updatedRoom.phase}`);
+        broadcastToRoom(roomId, {
+          type: "phase_changed",
+          data: { phase: updatedRoom.phase, room: updatedRoom },
+        });
+        
+        if (updatedRoom.phase === "spy_guess") {
+          startSpyGuessTimer(roomId);
+        }
+      }
     } else {
       console.log(`startSpyVotingTimer: Room phase already changed to ${currentRoom?.phase}`);
     }
