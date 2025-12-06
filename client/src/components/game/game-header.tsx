@@ -169,10 +169,12 @@ export function GameHeader() {
                       <Search className="w-12 h-12 mx-auto text-spy" />
                       <p className="text-2xl font-bold text-spy">أنت الجاسوس!</p>
                       <p className="text-xl font-medium text-foreground mt-3">
-                        {room?.selectedCategory === "countries" && "دولة"}
-                        {room?.selectedCategory === "fruits_vegetables" && "خضروات وفواكه"}
-                        {room?.selectedCategory === "animals" && "حيوان"}
-                        {room?.selectedCategory === "cars" && "سيارة"}
+                        {room?.externalWords?.category || (
+                          room?.selectedCategory === "countries" ? "دولة" :
+                          room?.selectedCategory === "fruits_vegetables" ? "خضروات وفواكه" :
+                          room?.selectedCategory === "animals" ? "حيوان" :
+                          room?.selectedCategory === "cars" ? "سيارة" : ""
+                        )}
                       </p>
                       <p className="text-muted-foreground text-sm">
                         حاول اكتشاف الكلمة من أسئلة اللاعبين
@@ -182,23 +184,27 @@ export function GameHeader() {
                     <>
                       <p className="text-3xl font-bold text-foreground">{playerWord}</p>
                       <p className="text-muted-foreground">
-                        {room?.selectedCategory === "countries" && "دولة"}
-                        {room?.selectedCategory === "fruits_vegetables" && "خضروات وفواكه"}
-                        {room?.selectedCategory === "animals" && "حيوان"}
-                        {room?.selectedCategory === "cars" && "سيارة"}
+                        {room?.externalWords?.category || (
+                          room?.selectedCategory === "countries" ? "دولة" :
+                          room?.selectedCategory === "fruits_vegetables" ? "خضروات وفواكه" :
+                          room?.selectedCategory === "animals" ? "حيوان" :
+                          room?.selectedCategory === "cars" ? "سيارة" : ""
+                        )}
                       </p>
                       <Button
                         variant="outline"
                         onClick={() => {
-                          if (playerWord && room?.selectedCategory) {
+                          if (playerWord) {
                             let categoryPrefix = "";
-                            if (room.selectedCategory === "countries") {
+                            if (room?.externalWords?.category) {
+                              categoryPrefix = room.externalWords.category + " ";
+                            } else if (room?.selectedCategory === "countries") {
                               categoryPrefix = "دولة ";
-                            } else if (room.selectedCategory === "fruits_vegetables") {
+                            } else if (room?.selectedCategory === "fruits_vegetables") {
                               categoryPrefix = "ثمرة ";
-                            } else if (room.selectedCategory === "animals") {
+                            } else if (room?.selectedCategory === "animals") {
                               categoryPrefix = "حيوان ";
-                            } else if (room.selectedCategory === "cars") {
+                            } else if (room?.selectedCategory === "cars") {
                               categoryPrefix = "سيارة ";
                             }
                             const searchQuery = encodeURIComponent(categoryPrefix + playerWord);

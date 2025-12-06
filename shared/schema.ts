@@ -6,6 +6,22 @@ export type GuessValidationMode = "system" | "players";
 
 export type WordSourceMode = "system" | "external";
 
+export interface GameSettings {
+  questionsPerPlayer: number; // 1-10
+  questionDuration: number; // 30-300 seconds
+  answerDuration: number; // 15-120 seconds
+  spyVotingDuration: number; // 15-120 seconds
+  spyGuessDuration: number; // 15-120 seconds
+}
+
+export const defaultGameSettings: GameSettings = {
+  questionsPerPlayer: 3,
+  questionDuration: 60,
+  answerDuration: 30,
+  spyVotingDuration: 30,
+  spyGuessDuration: 30,
+};
+
 export type GamePhase = 
   | "lobby"
   | "category_voting"
@@ -97,6 +113,7 @@ export interface Room {
   wordSource?: WordSourceMode;
   externalPlayerToken?: string;
   externalWords?: ExternalWords;
+  gameSettings: GameSettings;
 }
 
 export const categories = [
@@ -143,7 +160,8 @@ export type WebSocketMessage =
   | { type: "confirm_word_reveal" }
   | { type: "update_word_source"; data: { mode: WordSourceMode } }
   | { type: "set_external_words"; data: { roomCode: string; token: string; category: string; playerWord: string; spyWord: string } }
-  | { type: "join_spectator"; data: { roomCode: string; token: string } };
+  | { type: "join_spectator"; data: { roomCode: string; token: string } }
+  | { type: "update_game_settings"; data: { settings: Partial<GameSettings> } };
 
 export type ServerMessage =
   | { type: "room_created"; data: { room: Room; playerId: string; sessionToken: string } }

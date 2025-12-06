@@ -33,6 +33,7 @@ import {
   forceProcessSpyVotes,
   forceEndAskingPhase,
   forceEndAnsweringPhase,
+  updateGameSettings,
 } from "./game-storage";
 
 const clients = new Map<string, WebSocket>();
@@ -77,18 +78,32 @@ function clearRoomTimer(roomId: string): void {
   }
 }
 
-const SPY_VOTING_DURATION_MS = 30000;
-const SPY_GUESS_DURATION_MS = 30000;
 const CATEGORY_VOTING_DURATION_MS = 30000;
+
+function getSpyVotingDuration(room: Room): number {
+  return (room.gameSettings?.spyVotingDuration || 30) * 1000;
+}
+
+function getSpyGuessDuration(room: Room): number {
+  return (room.gameSettings?.spyGuessDuration || 30) * 1000;
+}
+
+function getQuestionDuration(room: Room): number {
+  return (room.gameSettings?.questionDuration || 60) * 1000;
+}
+
+function getAnswerDuration(room: Room): number {
+  return (room.gameSettings?.answerDuration || 30) * 1000;
+}
 
 function computeTimerRemaining(room: Room): number {
   if (!room.phaseStartTime) return 0;
   
   let duration = 0;
   if (room.phase === "spy_voting") {
-    duration = SPY_VOTING_DURATION_MS;
+    duration = getSpyVotingDuration(room);
   } else if (room.phase === "spy_guess") {
-    duration = SPY_GUESS_DURATION_MS;
+    duration = getSpyGuessDuration(room);
   } else if (room.phase === "category_voting") {
     duration = CATEGORY_VOTING_DURATION_MS;
   } else if (room.phase === "questioning" && room.turnTimerEnd) {
@@ -174,7 +189,7 @@ function startAnswerTimer(roomId: string): void {
   const room = getRoom(roomId);
   if (!room || room.phase !== "questioning") return;
   
-  const ANSWER_DURATION = 30000; // 30 seconds
+  const ANSWER_DURATION = getAnswerDuration(room);
   const answerStartTime = Date.now();
   
   // Function to broadcast timer update
@@ -247,7 +262,7 @@ function startTurnTimer(roomId: string, forceReset: boolean = true): void {
   const room = getRoom(roomId);
   if (!room || room.phase !== "questioning") return;
   
-  const TURN_DURATION = 60000; // 60 seconds for asking
+  const TURN_DURATION = getQuestionDuration(room);
   let timeRemaining: number;
   
   if (forceReset || !room.turnTimerEnd || room.turnTimerEnd <= Date.now()) {
@@ -393,7 +408,7 @@ function startSpyVotingTimer(roomId: string): void {
     return;
   }
   
-  const SPY_VOTING_DURATION = 30000; // 30 seconds
+  const SPY_VOTING_DURATION = getSpyVotingDuration(room);
   console.log(`startSpyVotingTimer: Starting timer for room ${roomId}`);
   
   // Set phase start time
@@ -520,7 +535,7 @@ function startSpyGuessTimer(roomId: string): void {
   const room = getRoom(roomId);
   if (!room || room.phase !== "spy_guess") return;
   
-  const SPY_GUESS_DURATION = 30000; // 30 seconds for spy to guess
+  const SPY_GUESS_DURATION = getSpyGuessDuration(room);
   room.phaseStartTime = Date.now();
   
   let countdownInterval: NodeJS.Timeout;
@@ -1090,6 +1105,19 @@ function handleMessage(ws: WebSocket, data: string): void {
         broadcastToRoom(roomId, {
           type: "player_left",
           data: { playerId, room: updatedRoom },
+        });
+      }
+      break;
+    }
+
+    case "update_game_settings": {
+      if (!playerId) return;
+      const settings = message.data.settings;
+      const updatedRoom = updateGameSettings(playerId, settings);
+      if (updatedRoom) {
+        broadcastToRoom(updatedRoom.id, {
+          type: "room_updated",
+          data: { room: updatedRoom },
         });
       }
       break;

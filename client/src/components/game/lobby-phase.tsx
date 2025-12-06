@@ -7,10 +7,11 @@ import { Separator } from "@/components/ui/separator";
 import { Input } from "@/components/ui/input";
 import { useGame } from "@/lib/game-context";
 import { useToast } from "@/hooks/use-toast";
-import { getMinPlayersForStart, getMaxPlayers, getSpyCountForPlayers } from "@shared/schema";
+import { Slider } from "@/components/ui/slider";
+import { getMinPlayersForStart, getMaxPlayers, getSpyCountForPlayers, defaultGameSettings } from "@shared/schema";
 
 export function LobbyPhase() {
-  const { room, currentPlayer, isHost, toggleReady, startGame, updateSpyCount, updateGuessValidationMode, updateWordSource } = useGame();
+  const { room, currentPlayer, isHost, toggleReady, startGame, updateSpyCount, updateGuessValidationMode, updateWordSource, updateGameSettings } = useGame();
   const { toast } = useToast();
   const [copied, setCopied] = useState(false);
 
@@ -170,6 +171,106 @@ export function LobbyPhase() {
                 >
                   <Plus className="w-4 h-4" />
                 </Button>
+              </div>
+            </div>
+
+            <Separator />
+
+            <div className="space-y-3">
+              <p className="font-medium">عدد الأسئلة لكل لاعب</p>
+              <div className="flex items-center gap-4">
+                <Slider
+                  value={[room.gameSettings?.questionsPerPlayer || defaultGameSettings.questionsPerPlayer]}
+                  onValueChange={(value) => updateGameSettings({ questionsPerPlayer: value[0] })}
+                  min={1}
+                  max={10}
+                  step={1}
+                  className="flex-1"
+                  data-testid="slider-questions-per-player"
+                />
+                <span className="w-12 text-center font-bold text-lg">
+                  {room.gameSettings?.questionsPerPlayer || defaultGameSettings.questionsPerPlayer}
+                </span>
+              </div>
+            </div>
+
+            <Separator />
+
+            <div className="space-y-3">
+              <p className="font-medium">مدة السؤال (ثانية)</p>
+              <div className="flex items-center gap-4">
+                <Slider
+                  value={[room.gameSettings?.questionDuration || defaultGameSettings.questionDuration]}
+                  onValueChange={(value) => updateGameSettings({ questionDuration: value[0] })}
+                  min={30}
+                  max={300}
+                  step={15}
+                  className="flex-1"
+                  data-testid="slider-question-duration"
+                />
+                <span className="w-12 text-center font-bold text-lg">
+                  {room.gameSettings?.questionDuration || defaultGameSettings.questionDuration}
+                </span>
+              </div>
+            </div>
+
+            <Separator />
+
+            <div className="space-y-3">
+              <p className="font-medium">مدة الإجابة (ثانية)</p>
+              <div className="flex items-center gap-4">
+                <Slider
+                  value={[room.gameSettings?.answerDuration || defaultGameSettings.answerDuration]}
+                  onValueChange={(value) => updateGameSettings({ answerDuration: value[0] })}
+                  min={15}
+                  max={120}
+                  step={5}
+                  className="flex-1"
+                  data-testid="slider-answer-duration"
+                />
+                <span className="w-12 text-center font-bold text-lg">
+                  {room.gameSettings?.answerDuration || defaultGameSettings.answerDuration}
+                </span>
+              </div>
+            </div>
+
+            <Separator />
+
+            <div className="space-y-3">
+              <p className="font-medium">مدة التصويت على الجاسوس (ثانية)</p>
+              <div className="flex items-center gap-4">
+                <Slider
+                  value={[room.gameSettings?.spyVotingDuration || defaultGameSettings.spyVotingDuration]}
+                  onValueChange={(value) => updateGameSettings({ spyVotingDuration: value[0] })}
+                  min={15}
+                  max={120}
+                  step={5}
+                  className="flex-1"
+                  data-testid="slider-spy-voting-duration"
+                />
+                <span className="w-12 text-center font-bold text-lg">
+                  {room.gameSettings?.spyVotingDuration || defaultGameSettings.spyVotingDuration}
+                </span>
+              </div>
+            </div>
+
+            <Separator />
+
+            <div className="space-y-3">
+              <p className="font-medium">مدة تخمين الجاسوس (ثانية)</p>
+              <div className="flex items-center gap-4">
+                <Slider
+                  value={[room.gameSettings?.spyGuessDuration || defaultGameSettings.spyGuessDuration]}
+                  onValueChange={(value) => updateGameSettings({ spyGuessDuration: value[0] })}
+                  min={15}
+                  max={120}
+                  step={5}
+                  className="flex-1"
+                  data-testid="slider-spy-guess-duration"
+                />
+                <span className="w-12 text-center font-bold text-lg">
+                  {room.gameSettings?.spyGuessDuration || defaultGameSettings.spyGuessDuration}
+                </span>
               </div>
             </div>
 

@@ -1,5 +1,5 @@
-import type { Room, Player, GameMode, GamePhase, Message, Question, CategoryVote, SpyVote, GuessValidationMode, WordSourceMode, ExternalWords } from "@shared/schema";
-import { getSpyCountForPlayers, getMinPlayersForStart, categories } from "@shared/schema";
+import type { Room, Player, GameMode, GamePhase, Message, Question, CategoryVote, SpyVote, GuessValidationMode, WordSourceMode, ExternalWords, GameSettings } from "@shared/schema";
+import { getSpyCountForPlayers, getMinPlayersForStart, categories, defaultGameSettings } from "@shared/schema";
 import { getRandomWord, getSimilarWord } from "./words";
 import { randomUUID } from "crypto";
 
@@ -113,6 +113,7 @@ export function createRoom(playerName: string, gameMode: GameMode): { room: Room
     turnQueue: [],
     guessValidationMode: "system",
     wordSource: "system",
+    gameSettings: { ...defaultGameSettings },
   };
 
   rooms.set(roomId, room);
@@ -237,6 +238,35 @@ export function updateGuessValidationMode(playerId: string, mode: GuessValidatio
   if (room.phase !== "lobby") return undefined;
 
   room.guessValidationMode = mode;
+  return room;
+}
+
+export function updateGameSettings(playerId: string, settings: Partial<GameSettings>): Room | undefined {
+  const room = getRoomByPlayerId(playerId);
+  if (!room) return undefined;
+
+  const player = room.players.find((p) => p.id === playerId);
+  if (!player?.isHost) return undefined;
+  if (room.phase !== "lobby") return undefined;
+
+  // Validate and apply settings
+  if (settings.questionsPerPlayer !== undefined) {
+    room.gameSettings.questionsPerPlayer = Math.max(1, Math.min(10, settings.questionsPerPlayer));
+    room.questionsPerPlayer = room.gameSettings.questionsPerPlayer;
+  }
+  if (settings.questionDuration !== undefined) {
+    room.gameSettings.questionDuration = Math.max(30, Math.min(300, settings.questionDuration));
+  }
+  if (settings.answerDuration !== undefined) {
+    room.gameSettings.answerDuration = Math.max(15, Math.min(120, settings.answerDuration));
+  }
+  if (settings.spyVotingDuration !== undefined) {
+    room.gameSettings.spyVotingDuration = Math.max(15, Math.min(120, settings.spyVotingDuration));
+  }
+  if (settings.spyGuessDuration !== undefined) {
+    room.gameSettings.spyGuessDuration = Math.max(15, Math.min(120, settings.spyGuessDuration));
+  }
+
   return room;
 }
 
