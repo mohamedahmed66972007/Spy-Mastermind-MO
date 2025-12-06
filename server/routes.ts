@@ -595,9 +595,6 @@ function forceProcessGuessValidation(roomId: string): void {
   const room = getRoom(roomId);
   if (!room || room.phase !== "guess_validation") return;
   
-  // النقاط للاعبين تم منحها بالفعل في processSpyVotes
-  // لا نمنحها مرة أخرى هنا
-  
   // Count votes - if more "correct" votes or tie, spy also wins a point
   const correctVotes = room.guessValidationVotes.filter(v => v.isCorrect).length;
   const incorrectVotes = room.guessValidationVotes.filter(v => !v.isCorrect).length;
@@ -607,8 +604,13 @@ function forceProcessGuessValidation(roomId: string): void {
     room.players.forEach(p => {
       if (room.revealedSpyIds.includes(p.id)) {
         p.score = (p.score || 0) + 1;
+        console.log(`forceProcessGuessValidation: Awarded point to spy ${p.name} (validated as correct)`);
       }
     });
+    room.spyGuessCorrect = true;
+  } else {
+    room.spyGuessCorrect = false;
+    // No additional points for non-spy players - already awarded in processSpyVotes
   }
   
   room.phase = "results";
