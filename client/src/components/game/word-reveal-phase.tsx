@@ -13,6 +13,26 @@ export function WordRevealPhase() {
   const isSpy = currentPlayer.role === "spy";
   const word = currentPlayer.word || "";
 
+  // Get category name to display
+  const getCategoryName = () => {
+    if (!room.selectedCategory) return "";
+    
+    // If external words, use the category directly
+    if (room.wordSource === "external") {
+      return room.selectedCategory;
+    }
+    
+    // Otherwise, translate predefined categories
+    const categoryMap: Record<string, string> = {
+      countries: "دولة",
+      fruits_vegetables: "خضروات وفواكه",
+      animals: "حيوان",
+      cars: "سيارة"
+    };
+    
+    return categoryMap[room.selectedCategory] || room.selectedCategory;
+  };
+
   const handleInfoClick = () => {
     if (word && !isSpy && room?.selectedCategory) {
       let categoryPrefix = "";
@@ -63,10 +83,7 @@ export function WordRevealPhase() {
                       أنت الجاسوس!
                     </p>
                     <p className="text-2xl font-medium text-foreground mt-4">
-                      {room.selectedCategory === "countries" && "دولة"}
-                      {room.selectedCategory === "fruits_vegetables" && "خضروات وفواكه"}
-                      {room.selectedCategory === "animals" && "حيوان"}
-                      {room.selectedCategory === "cars" && "سيارة"}
+                      {getCategoryName()}
                     </p>
                     <p className="text-muted-foreground">
                       حاول اكتشاف الكلمة من أسئلة اللاعبين
@@ -78,13 +95,7 @@ export function WordRevealPhase() {
                       {word}
                     </p>
                     <p className="text-muted-foreground">
-                      {room.selectedCategory === "countries" && "دولة"}
-                      {room.selectedCategory === "fruits_vegetables" && "خضروات وفواكه"}
-                      {room.selectedCategory === "animals" && "حيوان"}
-                      {room.selectedCategory === "cars" && "سيارة"}
-                      {room.externalWords && room.externalWords.category && (
-                        <span>{room.externalWords.category}</span>
-                      )}
+                      {getCategoryName()}
                     </p>
                   </>
                 )}
