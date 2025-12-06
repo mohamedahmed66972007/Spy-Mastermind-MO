@@ -375,14 +375,11 @@ function startSpyVotingTimer(roomId: string): void {
   // Set phase start time
   room.phaseStartTime = Date.now();
   
-  let countdownInterval: NodeJS.Timeout;
-  
   // Function to broadcast timer update
   const broadcastTimer = () => {
     const currentRoom = getRoom(roomId);
     if (!currentRoom || currentRoom.phase !== "spy_voting") {
       console.log(`startSpyVotingTimer: Clearing interval - phase changed`);
-      if (countdownInterval) clearInterval(countdownInterval);
       return false;
     }
     
@@ -396,26 +393,23 @@ function startSpyVotingTimer(roomId: string): void {
       data: { timeRemaining: remaining },
     });
     
-    // Clear interval when time is up
-    if (remaining === 0) {
-      if (countdownInterval) clearInterval(countdownInterval);
-      return false;
-    }
-    
-    return true;
+    return remaining > 0;
   };
   
   // Broadcast initial timer
   broadcastTimer();
   
   // Countdown interval - broadcast every second
-  countdownInterval = setInterval(() => {
-    broadcastTimer();
+  const countdownInterval = setInterval(() => {
+    const shouldContinue = broadcastTimer();
+    if (!shouldContinue) {
+      clearInterval(countdownInterval);
+    }
   }, 1000);
   
   const timer = setTimeout(() => {
     console.log(`startSpyVotingTimer: Timer expired for room ${roomId}`);
-    if (countdownInterval) clearInterval(countdownInterval);
+    clearInterval(countdownInterval);
     const currentRoom = getRoom(roomId);
     if (currentRoom && currentRoom.phase === "spy_voting") {
       console.log(`startSpyVotingTimer: Forcing end of spy voting`);
