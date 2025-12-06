@@ -229,9 +229,13 @@ function startSpyVotingTimer(roomId: string): void {
   clearVotingTimer(roomId);
   
   const room = getRoom(roomId);
-  if (!room || room.phase !== "spy_voting") return;
+  if (!room || room.phase !== "spy_voting") {
+    console.log(`startSpyVotingTimer: Cannot start - phase=${room?.phase}`);
+    return;
+  }
   
   const SPY_VOTING_DURATION = 30000; // 30 seconds
+  console.log(`startSpyVotingTimer: Starting timer for room ${roomId}`);
   
   broadcastToRoom(roomId, {
     type: "timer_update",
@@ -241,6 +245,7 @@ function startSpyVotingTimer(roomId: string): void {
   const countdownInterval = setInterval(() => {
     const currentRoom = getRoom(roomId);
     if (!currentRoom || currentRoom.phase !== "spy_voting") {
+      console.log(`startSpyVotingTimer: Clearing interval - phase changed`);
       clearInterval(countdownInterval);
       return;
     }
@@ -255,11 +260,15 @@ function startSpyVotingTimer(roomId: string): void {
   }, 1000);
   
   const timer = setTimeout(() => {
+    console.log(`startSpyVotingTimer: Timer expired for room ${roomId}`);
     clearInterval(countdownInterval);
     const currentRoom = getRoom(roomId);
     if (currentRoom && currentRoom.phase === "spy_voting") {
+      console.log(`startSpyVotingTimer: Forcing end of spy voting`);
       // Force move to next phase even if not all voted
       forceEndSpyVoting(roomId);
+    } else {
+      console.log(`startSpyVotingTimer: Room phase already changed to ${currentRoom?.phase}`);
     }
     votingTimers.delete(roomId);
   }, SPY_VOTING_DURATION);
@@ -279,15 +288,25 @@ function forceEndCategoryVoting(roomId: string): void {
 }
 
 function forceEndSpyVoting(roomId: string): void {
-  const room = forceProcessSpyVotes(roomId);
-  if (room) {
-    room.phaseStartTime = Date.now();
+  const room = getRoom(roomId);
+  if (!room || room.phase !== "spy_voting") {
+    console.log(`forceEndSpyVoting: Invalid state - roomId=${roomId}, phase=${room?.phase}`);
+    return;
+  }
+
+  console.log(`forceEndSpyVoting: Processing votes for room ${roomId}, votes count: ${room.spyVotes.length}`);
+  
+  const updatedRoom = forceProcessSpyVotes(roomId);
+  if (updatedRoom) {
+    console.log(`forceEndSpyVoting: Moved to phase ${updatedRoom.phase}`);
     broadcastToRoom(roomId, {
       type: "phase_changed",
-      data: { phase: room.phase, room },
+      data: { phase: updatedRoom.phase, room: updatedRoom },
     });
+    
     // Start spy guess timer if we're in spy_guess phase
-    if (room.phase === "spy_guess") {
+    if (updatedRoom.phase === "spy_guess") {
+      console.log(`forceEndSpyVoting: Starting spy guess timer`);
       startSpyGuessTimer(roomId);
     }
   }

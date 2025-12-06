@@ -565,11 +565,20 @@ export function voteSpy(playerId: string, suspectId: string): Room | undefined {
 
 export function forceProcessSpyVotes(roomId: string): Room | undefined {
   const room = rooms.get(roomId);
-  if (!room) return undefined;
-  if (room.phase !== "spy_voting") return undefined;
+  if (!room) {
+    console.log(`forceProcessSpyVotes: Room not found - ${roomId}`);
+    return undefined;
+  }
+  if (room.phase !== "spy_voting") {
+    console.log(`forceProcessSpyVotes: Invalid phase - ${room.phase}`);
+    return undefined;
+  }
+
+  console.log(`forceProcessSpyVotes: Processing room ${roomId}, votes: ${room.spyVotes.length}`);
 
   // If no one voted at all, move to results without revealing anyone
   if (room.spyVotes.length === 0) {
+    console.log(`forceProcessSpyVotes: No votes, moving to results`);
     room.phase = "results";
     room.phaseStartTime = Date.now();
     return room;
@@ -577,12 +586,16 @@ export function forceProcessSpyVotes(roomId: string): Room | undefined {
 
   // Process whatever votes we have
   processSpyVotes(room);
+  console.log(`forceProcessSpyVotes: After processing, phase is ${room.phase}`);
   return room;
 }
 
 function processSpyVotes(room: Room): void {
+  console.log(`processSpyVotes: Starting with ${room.spyVotes.length} votes`);
+  
   // If no votes at all, just move to results
   if (room.spyVotes.length === 0) {
+    console.log(`processSpyVotes: No votes, moving to results`);
     room.phase = "results";
     room.phaseStartTime = Date.now();
     return;
@@ -593,10 +606,14 @@ function processSpyVotes(room: Room): void {
     return acc;
   }, {} as Record<string, number>);
 
+  console.log(`processSpyVotes: Vote counts:`, voteCounts);
+
   const maxVotes = Math.max(...Object.values(voteCounts), 0);
+  console.log(`processSpyVotes: Max votes: ${maxVotes}`);
   
   // If no one got any votes (shouldn't happen but let's be safe)
   if (maxVotes === 0) {
+    console.log(`processSpyVotes: No one got votes, moving to results`);
     room.phase = "results";
     room.phaseStartTime = Date.now();
     return;
@@ -606,7 +623,10 @@ function processSpyVotes(room: Room): void {
     .filter(([_, count]) => count === maxVotes && count > 0)
     .map(([id]) => id);
 
+  console.log(`processSpyVotes: Top suspects:`, topSuspects);
+
   if (topSuspects.length === 0) {
+    console.log(`processSpyVotes: No top suspects, moving to results`);
     room.phase = "results";
     room.phaseStartTime = Date.now();
     return;
@@ -640,14 +660,18 @@ function processSpyVotes(room: Room): void {
 
   if (isSpy) {
     // Spy is revealed, move to spy guess phase
+    console.log(`processSpyVotes: Spy revealed (${revealedPlayer?.name}), moving to spy_guess`);
     room.phase = "spy_guess";
     room.phaseStartTime = Date.now();
   } else {
     // Spy was not revealed, move to results phase directly
     // No points awarded to spy for players voting wrong.
+    console.log(`processSpyVotes: Non-spy revealed (${revealedPlayer?.name}), moving to results`);
     room.phase = "results";
     room.phaseStartTime = Date.now();
   }
+  
+  console.log(`processSpyVotes: Final phase is ${room.phase}`);
 }
 
 export function submitGuess(playerId: string, guess: string): Room | undefined {
