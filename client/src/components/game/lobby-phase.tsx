@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Crown, Check, Clock, Play, Settings, Users, Minus, Plus, Bot, UsersRound, Eye, Copy, Link } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -11,9 +11,51 @@ import { Slider } from "@/components/ui/slider";
 import { getMinPlayersForStart, getMaxPlayers, getSpyCountForPlayers, defaultGameSettings } from "@shared/schema";
 
 export function LobbyPhase() {
-  const { room, currentPlayer, isHost, toggleReady, startGame, updateSpyCount, updateGuessValidationMode, updateWordSource, updateGameSettings } = useGame();
+  const { room, currentPlayer, isHost, toggleReady, startGame, updateSpyCount, updateGuessValidationMode, updateWordSource, updateGameSettings: updateServerSettings } = useGame();
   const { toast } = useToast();
   const [copied, setCopied] = useState(false);
+
+  // Local state for smooth slider updates
+  const [localSettings, setLocalSettings] = useState({
+    questionsPerPlayer: room?.gameSettings?.questionsPerPlayer || defaultGameSettings.questionsPerPlayer,
+    questionDuration: room?.gameSettings?.questionDuration || defaultGameSettings.questionDuration,
+    answerDuration: room?.gameSettings?.answerDuration || defaultGameSettings.answerDuration,
+    spyVotingDuration: room?.gameSettings?.spyVotingDuration || defaultGameSettings.spyVotingDuration,
+    spyGuessDuration: room?.gameSettings?.spyGuessDuration || defaultGameSettings.spyGuessDuration,
+  });
+
+  // Sync local state with room settings when they change from server
+  useEffect(() => {
+    if (room?.gameSettings) {
+      setLocalSettings({
+        questionsPerPlayer: room.gameSettings.questionsPerPlayer,
+        questionDuration: room.gameSettings.questionDuration,
+        answerDuration: room.gameSettings.answerDuration,
+        spyVotingDuration: room.gameSettings.spyVotingDuration,
+        spyGuessDuration: room.gameSettings.spyGuessDuration,
+      });
+    }
+  }, [room?.gameSettings]);
+
+  // Debounced update function
+  const debouncedUpdate = useCallback(
+    (() => {
+      let timeoutId: NodeJS.Timeout;
+      return (settings: Partial<typeof localSettings>) => {
+        clearTimeout(timeoutId);
+        timeoutId = setTimeout(() => {
+          updateServerSettings(settings);
+        }, 300); // 300ms delay
+      };
+    })(),
+    [updateServerSettings]
+  );
+
+  // Update local state immediately and schedule server update
+  const updateGameSettings = (settings: Partial<typeof localSettings>) => {
+    setLocalSettings(prev => ({ ...prev, ...settings }));
+    debouncedUpdate(settings);
+  };
 
   if (!room || !currentPlayer) return null;
 
@@ -21,7 +63,7 @@ export function LobbyPhase() {
   const maxPlayers = getMaxPlayers();
   const readyPlayers = room.players.filter((p) => p.isReady || p.isHost).length;
   const allReady = room.players.every((p) => p.isReady || p.isHost);
-  
+
   const wordSource = room.wordSource || "system";
   const hasExternalWords = wordSource === "external" && room.externalWords;
   const canStart = room.players.length >= minPlayers && allReady && (wordSource !== "external" || hasExternalWords);
@@ -180,7 +222,7 @@ export function LobbyPhase() {
               <p className="font-medium">عدد الأسئلة لكل لاعب</p>
               <div className="flex items-center gap-4">
                 <Slider
-                  value={[room.gameSettings?.questionsPerPlayer || defaultGameSettings.questionsPerPlayer]}
+                  value={[localSettings.questionsPerPlayer]}
                   onValueChange={(value) => updateGameSettings({ questionsPerPlayer: value[0] })}
                   min={1}
                   max={10}
@@ -189,7 +231,7 @@ export function LobbyPhase() {
                   data-testid="slider-questions-per-player"
                 />
                 <span className="w-12 text-center font-bold text-lg">
-                  {room.gameSettings?.questionsPerPlayer || defaultGameSettings.questionsPerPlayer}
+                  {localSettings.questionsPerPlayer}
                 </span>
               </div>
             </div>
@@ -200,7 +242,7 @@ export function LobbyPhase() {
               <p className="font-medium">مدة السؤال (ثانية)</p>
               <div className="flex items-center gap-4">
                 <Slider
-                  value={[room.gameSettings?.questionDuration || defaultGameSettings.questionDuration]}
+                  value={[localSettings.questionDuration]}
                   onValueChange={(value) => updateGameSettings({ questionDuration: value[0] })}
                   min={30}
                   max={300}
@@ -209,7 +251,7 @@ export function LobbyPhase() {
                   data-testid="slider-question-duration"
                 />
                 <span className="w-12 text-center font-bold text-lg">
-                  {room.gameSettings?.questionDuration || defaultGameSettings.questionDuration}
+                  {localSettings.questionDuration}
                 </span>
               </div>
             </div>
@@ -220,7 +262,7 @@ export function LobbyPhase() {
               <p className="font-medium">مدة الإجابة (ثانية)</p>
               <div className="flex items-center gap-4">
                 <Slider
-                  value={[room.gameSettings?.answerDuration || defaultGameSettings.answerDuration]}
+                  value={[localSettings.answerDuration]}
                   onValueChange={(value) => updateGameSettings({ answerDuration: value[0] })}
                   min={15}
                   max={120}
@@ -229,7 +271,7 @@ export function LobbyPhase() {
                   data-testid="slider-answer-duration"
                 />
                 <span className="w-12 text-center font-bold text-lg">
-                  {room.gameSettings?.answerDuration || defaultGameSettings.answerDuration}
+                  {localSettings.answerDuration}
                 </span>
               </div>
             </div>
@@ -240,7 +282,7 @@ export function LobbyPhase() {
               <p className="font-medium">مدة التصويت على الجاسوس (ثانية)</p>
               <div className="flex items-center gap-4">
                 <Slider
-                  value={[room.gameSettings?.spyVotingDuration || defaultGameSettings.spyVotingDuration]}
+                  value={[localSettings.spyVotingDuration]}
                   onValueChange={(value) => updateGameSettings({ spyVotingDuration: value[0] })}
                   min={15}
                   max={120}
@@ -249,7 +291,7 @@ export function LobbyPhase() {
                   data-testid="slider-spy-voting-duration"
                 />
                 <span className="w-12 text-center font-bold text-lg">
-                  {room.gameSettings?.spyVotingDuration || defaultGameSettings.spyVotingDuration}
+                  {localSettings.spyVotingDuration}
                 </span>
               </div>
             </div>
@@ -260,7 +302,7 @@ export function LobbyPhase() {
               <p className="font-medium">مدة تخمين الجاسوس (ثانية)</p>
               <div className="flex items-center gap-4">
                 <Slider
-                  value={[room.gameSettings?.spyGuessDuration || defaultGameSettings.spyGuessDuration]}
+                  value={[localSettings.spyGuessDuration]}
                   onValueChange={(value) => updateGameSettings({ spyGuessDuration: value[0] })}
                   min={15}
                   max={120}
@@ -269,7 +311,7 @@ export function LobbyPhase() {
                   data-testid="slider-spy-guess-duration"
                 />
                 <span className="w-12 text-center font-bold text-lg">
-                  {room.gameSettings?.spyGuessDuration || defaultGameSettings.spyGuessDuration}
+                  {localSettings.spyGuessDuration}
                 </span>
               </div>
             </div>
