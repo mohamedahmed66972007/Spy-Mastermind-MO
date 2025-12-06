@@ -47,15 +47,8 @@ function isGuessCorrect(guess: string, actualWord: string): boolean {
 function processSystemGuessValidation(room: Room, guessIsCorrect: boolean): void {
   room.spyGuessCorrect = guessIsCorrect;
 
-  // Award points to players who voted for the spy
-  room.players.forEach((p) => {
-    if (p.role !== "spy") {
-      const votedForSpy = room.spyVotes.some(v => v.voterId === p.id && room.players.find(player => player.id === v.suspectId)?.role === "spy");
-      if (votedForSpy) {
-        p.score = (p.score || 0) + 1;
-      }
-    }
-  });
+  // Points for voting correctly on the spy were already awarded in processSpyVotes
+  // Here we only handle the spy's guess result
 
   // If spy guessed correctly, spy gets a point
   if (guessIsCorrect) {
@@ -675,12 +668,17 @@ function processSpyVotes(room: Room): void {
     });
     console.log(`processSpyVotes: Spy revealed (${room.players.find(p => room.revealedSpyIds.includes(p.id))?.name}), moving to spy_guess`);
 
-    // Award point to non-spy players who voted
+    // Award point to non-spy players who voted correctly for the spy
     room.players.forEach((p) => {
-      const voted = activeVotes.some(v => v.voterId === p.id);
-      if (p.role !== "spy" && voted) {
-        p.score = (p.score || 0) + 1;
-        console.log(`processSpyVotes: Awarded point to ${p.name} (voted and not spy)`);
+      if (p.role !== "spy") {
+        const votedForSpy = activeVotes.some(v => 
+          v.voterId === p.id && 
+          room.revealedSpyIds.includes(v.suspectId)
+        );
+        if (votedForSpy) {
+          p.score = (p.score || 0) + 1;
+          console.log(`processSpyVotes: Awarded point to ${p.name} (voted correctly for spy)`);
+        }
       }
     });
 
@@ -755,15 +753,8 @@ function processGuessValidation(room: Room): void {
   const correctVotes = room.guessValidationVotes.filter((v) => v.isCorrect).length;
   const totalVotes = room.guessValidationVotes.length;
 
-  // Award points to players who correctly identified the spy during the spy voting phase
-  room.players.forEach((p) => {
-    if (p.role !== "spy") {
-      const votedForSpy = room.spyVotes.some(v => v.voterId === p.id && room.players.find(player => player.id === v.suspectId)?.role === "spy");
-      if (votedForSpy) {
-        p.score = (p.score || 0) + 1;
-      }
-    }
-  });
+  // Points for voting correctly on the spy were already awarded in processSpyVotes
+  // Here we only handle the spy's guess validation
 
   // If spy guessed correctly (more than half voted correct), spy also gets a point
   if (correctVotes > totalVotes / 2) {

@@ -80,9 +80,6 @@ export function ResultsPhase() {
                 {spy.id === playerId && (
                   <Badge variant="outline" className="text-xs">أنت</Badge>
                 )}
-                {room.revealedSpyIds.includes(spy.id) && (
-                  <Badge variant="secondary" className="text-xs">مكشوف</Badge>
-                )}
               </div>
             ))}
           </div>

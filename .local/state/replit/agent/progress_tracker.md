@@ -14,3 +14,4 @@
 [x] 14. Final migration verification - Dec 6, 2024 - All packages installed, workflow running, app fully functional
 [x] 15. Re-migration verification - Dec 6, 2024 - npm install completed, workflow restarted successfully, app fully functional with screenshot verification
 [x] 16. Fixed spy voting timer issue - Dec 6, 2024 - Added missing startSpyVotingTimer() calls to done_with_questions and end_turn handlers
+[x] 17. Fixed duplicate scoring issue - Dec 6, 2024 - Removed duplicate point awarding in processGuessValidation and processSystemGuessValidation. Now points for voting correctly on spy are only awarded once in processSpyVotes
