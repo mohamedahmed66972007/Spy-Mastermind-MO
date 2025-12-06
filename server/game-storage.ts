@@ -519,7 +519,7 @@ function advanceToNextTurn(room: Room): void {
         (nextPlayer.questionsRemaining === undefined || nextPlayer.questionsRemaining > 0)) {
       room.currentTurnPlayerId = nextPlayerId;
       room.currentPlayerIndex = room.players.findIndex(p => p.id === nextPlayerId);
-      room.turnTimerEnd = Date.now() + 60000; // 1 minute timer
+      room.turnTimerEnd = Date.now() + 60000; // 1 minute timer for next turn
       return;
     }
 
@@ -566,14 +566,20 @@ export function voteSpy(playerId: string, suspectId: string): Room | undefined {
   // Add new vote
   room.spyVotes.push({ voterId: playerId, suspectId });
 
-  // Check if all connected/active players have voted
-  const activePlayers = room.players.filter(p => !p.disconnectedAt);
-  const activeVotes = room.spyVotes.filter(v => {
-    const voter = room.players.find(p => p.id === v.voterId);
-    return voter && !voter.disconnectedAt;
-  });
+  // Don't auto-process when all voted - let the timer expire naturally
+  // This ensures consistent behavior and timer display
+  console.log(`voteSpy: Vote recorded. Waiting for timer to expire or all players to vote.`);
 
-  if (activeVotes.length === activePlayers.length) {
+  // Check if all active players have voted - only for early completion
+  const activePlayers = room.players.filter(p => !p.disconnectedAt);
+  const allVoted = activePlayers.length > 0 && activePlayers.every((p) =>
+    room.spyVotes.some((v) => v.voterId === p.id)
+  );
+
+  console.log(`voteSpy: allVoted=${allVoted}, activePlayers=${activePlayers.length}, votes=${room.spyVotes.length}`);
+
+  if (allVoted) {
+    console.log(`voteSpy: All players voted, processing immediately`);
     processSpyVotes(room);
   }
 
