@@ -73,8 +73,7 @@ export default function ExternalPlayer() {
     if (!roomId || !token) return;
 
     const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-    const host = window.location.host || `${window.location.hostname}:${window.location.port || (protocol === "wss:" ? 443 : 80)}`;
-    const wsUrl = `${protocol}//${host}/?token=${token}`;
+    const wsUrl = `${protocol}//${window.location.host}/ws`;
     const ws = new WebSocket(wsUrl);
     socketRef.current = ws;
 
