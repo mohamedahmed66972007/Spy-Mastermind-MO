@@ -10,6 +10,10 @@ import {
   togglePlayerReady,
   updateSpyCount,
   updateGuessValidationMode,
+  updateWordSource,
+  setExternalWords,
+  addSpectator,
+  getSpectators,
   startGame,
   voteCategory,
   askQuestion,
@@ -34,6 +38,7 @@ import {
 const clients = new Map<string, WebSocket>();
 const playerConnections = new Map<WebSocket, string>();
 const roomTimers = new Map<string, NodeJS.Timeout>();
+const spectatorClients = new Map<string, Map<string, WebSocket>>(); // roomId -> (token -> WebSocket)
 
 function broadcastToRoom(roomId: string, message: ServerMessage, excludePlayerId?: string): void {
   const room = getRoom(roomId);
@@ -46,6 +51,15 @@ function broadcastToRoom(roomId: string, message: ServerMessage, excludePlayerId
       client.send(JSON.stringify(message));
     }
   });
+
+  const roomSpectators = spectatorClients.get(roomId);
+  if (roomSpectators) {
+    roomSpectators.forEach((ws) => {
+      if (ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify(message));
+      }
+    });
+  }
 }
 
 function sendToPlayer(playerId: string, message: ServerMessage): void {
@@ -737,6 +751,60 @@ function handleMessage(ws: WebSocket, data: string): void {
           type: "room_updated",
           data: { room },
         });
+      }
+      break;
+    }
+
+    case "update_word_source": {
+      if (!playerId) return;
+      const room = updateWordSource(playerId, message.data.mode);
+      if (room) {
+        broadcastToRoom(room.id, {
+          type: "room_updated",
+          data: { room },
+        });
+      }
+      break;
+    }
+
+    case "set_external_words": {
+      const { roomCode, token, category, playerWord, spyWord } = message.data;
+      const room = setExternalWords(roomCode, token, category, playerWord, spyWord);
+      if (room) {
+        ws.send(JSON.stringify({
+          type: "external_words_set",
+          data: { success: true },
+        }));
+        broadcastToRoom(room.id, {
+          type: "room_updated",
+          data: { room },
+        });
+      } else {
+        ws.send(JSON.stringify({
+          type: "error",
+          data: { message: "فشل في تعيين الكلمات" },
+        }));
+      }
+      break;
+    }
+
+    case "join_spectator": {
+      const { roomCode, token } = message.data;
+      const room = addSpectator(roomCode, token);
+      if (room) {
+        if (!spectatorClients.has(roomCode)) {
+          spectatorClients.set(roomCode, new Map());
+        }
+        spectatorClients.get(roomCode)!.set(token, ws);
+        ws.send(JSON.stringify({
+          type: "spectator_joined",
+          data: { room },
+        }));
+      } else {
+        ws.send(JSON.stringify({
+          type: "error",
+          data: { message: "فشل في الانضمام كمشاهد" },
+        }));
       }
       break;
     }

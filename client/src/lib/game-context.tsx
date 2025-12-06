@@ -1,5 +1,5 @@
 import { createContext, useContext, useCallback, useEffect, useState, useRef, type ReactNode } from "react";
-import type { Room, Player, ServerMessage, WebSocketMessage, GameMode, Message, GuessValidationMode } from "@shared/schema";
+import type { Room, Player, ServerMessage, WebSocketMessage, GameMode, Message, GuessValidationMode, WordSourceMode } from "@shared/schema";
 
 const SESSION_STORAGE_KEY = "spy_mastermind_session";
 
@@ -50,6 +50,7 @@ interface GameContextType {
   sendChatMessage: (text: string) => void;
   updateSpyCount: (count: number) => void;
   updateGuessValidationMode: (mode: GuessValidationMode) => void;
+  updateWordSource: (mode: WordSourceMode) => void;
   nextRound: () => void;
   leaveRoom: () => void;
   clearError: () => void;
@@ -261,6 +262,13 @@ export function GameProvider({ children }: { children: ReactNode }) {
     [sendMessage]
   );
 
+  const updateWordSource = useCallback(
+    (mode: WordSourceMode) => {
+      sendMessage({ type: "update_word_source", data: { mode } });
+    },
+    [sendMessage]
+  );
+
   const nextRound = useCallback(() => {
     sendMessage({ type: "next_round" });
   }, [sendMessage]);
@@ -308,6 +316,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
         sendChatMessage,
         updateSpyCount,
         updateGuessValidationMode,
+        updateWordSource,
         nextRound,
         leaveRoom,
         clearError,

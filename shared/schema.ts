@@ -4,6 +4,8 @@ export type GameMode = "classic" | "blind";
 
 export type GuessValidationMode = "system" | "players";
 
+export type WordSourceMode = "system" | "external";
+
 export type GamePhase = 
   | "lobby"
   | "category_voting"
@@ -58,6 +60,12 @@ export interface Question {
   answer?: string;
 }
 
+export interface ExternalWords {
+  category: string;
+  playerWord: string;
+  spyWord: string;
+}
+
 export interface Room {
   id: string;
   hostId: string;
@@ -86,6 +94,9 @@ export interface Room {
   turnTimerEnd?: number;
   guessValidationMode: GuessValidationMode;
   phaseStartTime?: number;
+  wordSource?: WordSourceMode;
+  externalPlayerToken?: string;
+  externalWords?: ExternalWords;
 }
 
 export const categories = [
@@ -129,7 +140,10 @@ export type WebSocketMessage =
   | { type: "leave_room" }
   | { type: "done_with_questions" }
   | { type: "reconnect"; data: { sessionToken: string; roomCode: string } }
-  | { type: "confirm_word_reveal" };
+  | { type: "confirm_word_reveal" }
+  | { type: "update_word_source"; data: { mode: WordSourceMode } }
+  | { type: "set_external_words"; data: { roomCode: string; token: string; category: string; playerWord: string; spyWord: string } }
+  | { type: "join_spectator"; data: { roomCode: string; token: string } };
 
 export type ServerMessage =
   | { type: "room_created"; data: { room: Room; playerId: string; sessionToken: string } }
@@ -143,7 +157,9 @@ export type ServerMessage =
   | { type: "new_message"; data: { message: Message } }
   | { type: "reconnected"; data: { room: Room; playerId: string } }
   | { type: "spy_revealed"; data: { spyIds: string[]; room: Room } }
-  | { type: "turn_changed"; data: { currentPlayerId: string; room: Room } };
+  | { type: "turn_changed"; data: { currentPlayerId: string; room: Room } }
+  | { type: "external_words_set"; data: { success: boolean } }
+  | { type: "spectator_joined"; data: { room: Room } };
 
 export function getSpyCountForPlayers(playerCount: number): number {
   if (playerCount <= 6) return 1;
@@ -151,7 +167,8 @@ export function getSpyCountForPlayers(playerCount: number): number {
   return 3;
 }
 
-export function getMinPlayersForStart(): number {
+export function getMinPlayersForStart(gameMode?: GameMode): number {
+  if (gameMode === "blind") return 3;
   return 4;
 }
 

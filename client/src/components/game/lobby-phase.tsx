@@ -1,26 +1,48 @@
-import { Crown, Check, Clock, Play, Settings, Users, Minus, Plus, Bot, UsersRound } from "lucide-react";
+import { useState } from "react";
+import { Crown, Check, Clock, Play, Settings, Users, Minus, Plus, Bot, UsersRound, Eye, Copy, Link } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import { Input } from "@/components/ui/input";
 import { useGame } from "@/lib/game-context";
+import { useToast } from "@/hooks/use-toast";
 import { getMinPlayersForStart, getMaxPlayers, getSpyCountForPlayers } from "@shared/schema";
 
 export function LobbyPhase() {
-  const { room, currentPlayer, isHost, toggleReady, startGame, updateSpyCount, updateGuessValidationMode } = useGame();
+  const { room, currentPlayer, isHost, toggleReady, startGame, updateSpyCount, updateGuessValidationMode, updateWordSource } = useGame();
+  const { toast } = useToast();
+  const [copied, setCopied] = useState(false);
 
   if (!room || !currentPlayer) return null;
 
-  const minPlayers = getMinPlayersForStart();
+  const minPlayers = getMinPlayersForStart(room.gameMode);
   const maxPlayers = getMaxPlayers();
   const readyPlayers = room.players.filter((p) => p.isReady || p.isHost).length;
   const allReady = room.players.every((p) => p.isReady || p.isHost);
-  const canStart = room.players.length >= minPlayers && allReady;
+  
+  const wordSource = room.wordSource || "system";
+  const hasExternalWords = wordSource === "external" && room.externalWords;
+  const canStart = room.players.length >= minPlayers && allReady && (wordSource !== "external" || hasExternalWords);
   const defaultSpyCount = getSpyCountForPlayers(room.players.length);
 
   const handleSpyCountChange = (delta: number) => {
     const newCount = Math.max(1, Math.min(room.spyCount + delta, Math.floor(room.players.length / 2)));
     updateSpyCount(newCount);
+  };
+
+  const getExternalPlayerLink = () => {
+    if (!room.externalPlayerToken) return "";
+    const baseUrl = window.location.origin;
+    return `${baseUrl}/external/${room.id}/${room.externalPlayerToken}`;
+  };
+
+  const copyExternalLink = () => {
+    const link = getExternalPlayerLink();
+    navigator.clipboard.writeText(link);
+    setCopied(true);
+    toast({ title: "تم النسخ!", description: "تم نسخ الرابط بنجاح" });
+    setTimeout(() => setCopied(false), 2000);
   };
 
   return (
@@ -185,6 +207,86 @@ export function LobbyPhase() {
                 </Button>
               </div>
             </div>
+
+            {room.gameMode === "blind" && (
+              <>
+                <Separator />
+
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between gap-4">
+                    <div>
+                      <p className="font-medium">مصدر الكلمات</p>
+                      <p className="text-sm text-muted-foreground">
+                        {wordSource === "system" 
+                          ? "النظام: اختيار الكلمات من قاعدة البيانات" 
+                          : "خارجي: شخص خارج اللعبة يحدد الكلمات"}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <Button
+                        size="sm"
+                        variant={wordSource === "system" ? "default" : "outline"}
+                        onClick={() => updateWordSource("system")}
+                        className="gap-1"
+                        data-testid="button-word-source-system"
+                      >
+                        <Bot className="w-4 h-4" />
+                        النظام
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant={wordSource === "external" ? "default" : "outline"}
+                        onClick={() => updateWordSource("external")}
+                        className="gap-1"
+                        data-testid="button-word-source-external"
+                      >
+                        <Eye className="w-4 h-4" />
+                        خارجي
+                      </Button>
+                    </div>
+                  </div>
+
+                  {wordSource === "external" && room.externalPlayerToken && (
+                    <div className="space-y-2 p-3 rounded-lg bg-muted">
+                      <div className="flex items-center gap-2 text-sm font-medium">
+                        <Link className="w-4 h-4" />
+                        رابط اللاعب الخارجي
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Input
+                          value={getExternalPlayerLink()}
+                          readOnly
+                          className="text-xs"
+                          data-testid="input-external-link"
+                        />
+                        <Button
+                          size="icon"
+                          variant="outline"
+                          onClick={copyExternalLink}
+                          data-testid="button-copy-external-link"
+                        >
+                          <Copy className="w-4 h-4" />
+                        </Button>
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        شارك هذا الرابط مع شخص خارج اللعبة لتحديد الكلمات
+                      </p>
+                      {hasExternalWords ? (
+                        <Badge variant="default" className="gap-1 bg-success text-success-foreground">
+                          <Check className="w-3 h-3" />
+                          تم تحديد الكلمات
+                        </Badge>
+                      ) : (
+                        <Badge variant="secondary" className="gap-1">
+                          <Clock className="w-3 h-3" />
+                          في انتظار تحديد الكلمات
+                        </Badge>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
           </CardContent>
         </Card>
       )}

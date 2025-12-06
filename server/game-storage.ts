@@ -1,11 +1,12 @@
-import type { Room, Player, GameMode, GamePhase, Message, Question, CategoryVote, SpyVote, GuessValidationMode } from "@shared/schema";
-import { getSpyCountForPlayers, categories } from "@shared/schema";
+import type { Room, Player, GameMode, GamePhase, Message, Question, CategoryVote, SpyVote, GuessValidationMode, WordSourceMode, ExternalWords } from "@shared/schema";
+import { getSpyCountForPlayers, getMinPlayersForStart, categories } from "@shared/schema";
 import { getRandomWord, getSimilarWord } from "./words";
 import { randomUUID } from "crypto";
 
 const rooms = new Map<string, Room>();
 const playerToRoom = new Map<string, string>();
 const sessionTokenToPlayer = new Map<string, { playerId: string; roomId: string }>();
+const spectatorConnections = new Map<string, Set<string>>(); // roomId -> Set of spectator tokens
 
 const QUESTIONS_PER_PLAYER = 3;
 const SESSION_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes
@@ -111,6 +112,7 @@ export function createRoom(playerName: string, gameMode: GameMode): { room: Room
     questionsPerPlayer: QUESTIONS_PER_PLAYER,
     turnQueue: [],
     guessValidationMode: "system",
+    wordSource: "system",
   };
 
   rooms.set(roomId, room);
@@ -238,22 +240,144 @@ export function updateGuessValidationMode(playerId: string, mode: GuessValidatio
   return room;
 }
 
+function generateExternalPlayerToken(): string {
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789";
+  let result = "";
+  for (let i = 0; i < 12; i++) {
+    result += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return result;
+}
+
+export function updateWordSource(playerId: string, mode: WordSourceMode): Room | undefined {
+  const room = getRoomByPlayerId(playerId);
+  if (!room) return undefined;
+
+  const player = room.players.find((p) => p.id === playerId);
+  if (!player?.isHost) return undefined;
+  if (room.phase !== "lobby") return undefined;
+  if (room.gameMode !== "blind") return undefined;
+
+  room.wordSource = mode;
+  
+  if (mode === "external" && !room.externalPlayerToken) {
+    room.externalPlayerToken = generateExternalPlayerToken();
+  }
+  
+  if (mode === "system") {
+    room.externalPlayerToken = undefined;
+    room.externalWords = undefined;
+  }
+
+  return room;
+}
+
+export function setExternalWords(roomCode: string, token: string, category: string, playerWord: string, spyWord: string): Room | undefined {
+  const room = rooms.get(roomCode);
+  if (!room) return undefined;
+  if (room.phase !== "lobby") return undefined;
+  if (room.wordSource !== "external") return undefined;
+  if (room.externalPlayerToken !== token) return undefined;
+
+  room.externalWords = {
+    category,
+    playerWord,
+    spyWord,
+  };
+
+  return room;
+}
+
+export function addSpectator(roomCode: string, token: string): Room | undefined {
+  const room = rooms.get(roomCode);
+  if (!room) return undefined;
+  if (room.externalPlayerToken !== token) return undefined;
+
+  if (!spectatorConnections.has(roomCode)) {
+    spectatorConnections.set(roomCode, new Set());
+  }
+  spectatorConnections.get(roomCode)!.add(token);
+
+  return room;
+}
+
+export function isSpectator(roomCode: string, token: string): boolean {
+  const spectators = spectatorConnections.get(roomCode);
+  return spectators?.has(token) ?? false;
+}
+
+export function getSpectators(roomCode: string): Set<string> {
+  return spectatorConnections.get(roomCode) ?? new Set();
+}
+
 export function startGame(playerId: string): Room | undefined {
   const room = getRoomByPlayerId(playerId);
   if (!room) return undefined;
 
   const player = room.players.find((p) => p.id === playerId);
   if (!player?.isHost) return undefined;
-  if (room.players.length < 4) return undefined;
+  
+  const minPlayers = getMinPlayersForStart(room.gameMode);
+  if (room.players.length < minPlayers) return undefined;
 
   const allReady = room.players.every((p) => p.isReady || p.isHost);
   if (!allReady) return undefined;
 
-  room.phase = "category_voting";
-  room.phaseStartTime = Date.now(); // Start timer for category voting phase
-  room.categoryVotes = [];
+  if (room.wordSource === "external" && !room.externalWords) {
+    return undefined;
+  }
+
+  if (room.wordSource === "external" && room.externalWords) {
+    startGameWithExternalWords(room);
+  } else {
+    room.phase = "category_voting";
+    room.phaseStartTime = Date.now();
+    room.categoryVotes = [];
+  }
 
   return room;
+}
+
+function startGameWithExternalWords(room: Room): void {
+  if (!room.externalWords) return;
+
+  room.selectedCategory = room.externalWords.category;
+  room.currentWord = room.externalWords.playerWord;
+  room.spyWord = room.externalWords.spyWord;
+
+  const spyCount = room.spyCount || getSpyCountForPlayers(room.players.length);
+  const shuffledPlayers = [...room.players];
+  for (let i = shuffledPlayers.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [shuffledPlayers[i], shuffledPlayers[j]] = [shuffledPlayers[j], shuffledPlayers[i]];
+  }
+  const spyIds = shuffledPlayers.slice(0, spyCount).map((p) => p.id);
+
+  room.players.forEach((player) => {
+    if (spyIds.includes(player.id)) {
+      player.role = "spy";
+      player.word = room.spyWord;
+    } else {
+      player.role = "player";
+      player.word = room.currentWord;
+    }
+    player.questionsRemaining = QUESTIONS_PER_PLAYER;
+    player.doneWithQuestions = false;
+  });
+
+  room.phase = "word_reveal";
+  room.phaseStartTime = Date.now();
+  room.revealedSpyIds = [];
+  room.spyVotes = [];
+  room.questions = [];
+  room.questionsAsked = 0;
+  room.currentPlayerIndex = 0;
+  room.spyGuess = undefined;
+  room.spyGuessCorrect = undefined;
+  room.guessValidationVotes = [];
+  room.turnQueue = [...room.players].sort(() => Math.random() - 0.5).map(p => p.id);
+  room.currentTurnPlayerId = room.turnQueue[0];
+  room.turnTimerEnd = undefined;
 }
 
 export function voteCategory(playerId: string, category: string): Room | undefined {
