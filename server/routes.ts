@@ -804,6 +804,8 @@ function handleMessage(ws: WebSocket, data: string): void {
             type: "phase_changed",
             data: { phase: "spy_voting", room },
           });
+          // Start spy voting timer
+          startSpyVotingTimer(room.id);
         } else if (room.phase === "questioning" && room.currentTurnPlayerId) {
           // Turn changed, restart timer
           startTurnTimer(room.id);
@@ -880,6 +882,8 @@ function handleMessage(ws: WebSocket, data: string): void {
             type: "phase_changed",
             data: { phase: "spy_voting", room },
           });
+          // Start spy voting timer
+          startSpyVotingTimer(room.id);
         } else if (room.phase === "questioning" && room.currentTurnPlayerId) {
           // Turn changed, restart timer
           startTurnTimer(room.id);
