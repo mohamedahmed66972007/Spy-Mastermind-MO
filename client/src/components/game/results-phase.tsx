@@ -123,11 +123,11 @@ export function ResultsPhase() {
             const rank = index + 1;
             const isTopThree = rank <= 3;
             const bgColors = [
-              "bg-gradient-to-l from-yellow-100 to-yellow-50 border-yellow-300",
-              "bg-gradient-to-l from-gray-100 to-gray-50 border-gray-300",
-              "bg-gradient-to-l from-orange-100 to-orange-50 border-orange-300",
+              "bg-gradient-to-l from-yellow-100 to-yellow-50 dark:from-yellow-900/40 dark:to-yellow-800/20 border-yellow-300 dark:border-yellow-700",
+              "bg-gradient-to-l from-gray-100 to-gray-50 dark:from-gray-800/40 dark:to-gray-700/20 border-gray-300 dark:border-gray-600",
+              "bg-gradient-to-l from-orange-100 to-orange-50 dark:from-orange-900/40 dark:to-orange-800/20 border-orange-300 dark:border-orange-700",
             ];
-            const textColors = ["text-yellow-700", "text-gray-600", "text-orange-600"];
+            const textColors = ["text-yellow-700 dark:text-yellow-400", "text-gray-600 dark:text-gray-300", "text-orange-600 dark:text-orange-400"];
             
             return (
               <div
