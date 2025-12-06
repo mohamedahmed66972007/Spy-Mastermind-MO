@@ -12,6 +12,7 @@ export function SpyVotingPhase() {
   const { room, currentPlayer, playerId, voteSpy, timerRemaining } = useGame();
   const [selectedSuspect, setSelectedSuspect] = useState<string | null>(null);
   const playedWarning = useRef(false);
+  const [localTimer, setLocalTimer] = useState(timerRemaining); // Initialize with server timer
 
   // Play warning sound when timer reaches 10 seconds
   useEffect(() => {
@@ -23,6 +24,34 @@ export function SpyVotingPhase() {
       playedWarning.current = false;
     }
   }, [timerRemaining]);
+
+  // Reset local timer when server sends timer update
+  useEffect(() => {
+    setLocalTimer(timerRemaining);
+    if (timerRemaining > 10) {
+      playedWarning.current = false;
+    }
+  }, [timerRemaining]);
+
+  // Countdown interval - only run when phase is spy_voting
+  useEffect(() => {
+    if (room?.phase !== "spy_voting") return;
+
+    const interval = setInterval(() => {
+      setLocalTimer((prev) => {
+        if (prev <= 0) return 0;
+        const newVal = prev - 1;
+        if (newVal === 10 && !playedWarning.current) {
+          playTimerWarningSound();
+          playedWarning.current = true;
+        }
+        return newVal;
+      });
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [room?.phase]);
+
 
   if (!room || !currentPlayer) return null;
 
@@ -55,21 +84,21 @@ export function SpyVotingPhase() {
         <Badge variant="outline" className="mt-2">
           {totalVotes}/{totalPlayers} صوتوا
         </Badge>
-        
+
         {/* Timer display - always show during voting phase */}
-        {timerRemaining > 0 && (
+        {localTimer > 0 && (
           <div className="mt-4">
             <div className="flex items-center justify-center gap-2 mb-2">
-              <Clock className={`w-5 h-5 ${timerRemaining <= 10 ? 'text-destructive animate-pulse' : 'text-spy'}`} />
-              <span className={`text-xl font-bold tabular-nums ${timerRemaining <= 10 ? 'text-destructive' : ''}`}>
-                {Math.floor(timerRemaining / 60)}:{(timerRemaining % 60).toString().padStart(2, '0')}
+              <Clock className={`w-5 h-5 ${localTimer <= 10 ? 'text-destructive animate-pulse' : 'text-primary'}`} />
+              <span className={`text-xl font-bold tabular-nums ${localTimer <= 10 ? 'text-destructive' : ''}`}>
+                {Math.floor(localTimer / 60)}:{(localTimer % 60).toString().padStart(2, '0')}
               </span>
             </div>
-            <Progress value={(timerRemaining / 30) * 100} className="h-2 w-48 mx-auto" />
+            <Progress value={(localTimer / 30) * 100} className="h-2 w-48 mx-auto" />
           </div>
         )}
-        
-        
+
+
       </div>
 
       <Card>
