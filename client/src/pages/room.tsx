@@ -9,7 +9,6 @@ import { SpyVotingPhase } from "@/components/game/spy-voting-phase";
 import { SpyGuessPhase } from "@/components/game/spy-guess-phase";
 import { GuessValidationPhase } from "@/components/game/guess-validation-phase";
 import { ResultsPhase } from "@/components/game/results-phase";
-import { ChatPanel } from "@/components/game/chat-panel";
 import { GameHeader } from "@/components/game/game-header";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -59,22 +58,15 @@ export default function Room() {
     }
   };
 
-  const showChat = room.phase !== "lobby";
-
   return (
     <div className="min-h-screen bg-background flex flex-col">
       <GameHeader />
-      <div className="flex-1 flex flex-col lg:flex-row">
+      <div className="flex-1 flex flex-col">
         <main className="flex-1 p-4 overflow-auto">
           <div className="max-w-4xl mx-auto animate-fade-in">
             {renderPhase()}
           </div>
         </main>
-        {showChat && (
-          <aside className="lg:w-80 border-t lg:border-t-0 lg:border-r border-border">
-            <ChatPanel />
-          </aside>
-        )}
       </div>
     </div>
   );

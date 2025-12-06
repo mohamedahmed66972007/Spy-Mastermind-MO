@@ -23,6 +23,7 @@ import {
 } from "@/components/ui/dialog";
 import { useTheme } from "@/lib/theme-provider";
 import { useGame } from "@/lib/game-context";
+import { ChatPopover } from "./chat-popover";
 
 export function GameHeader() {
   const { theme, toggleTheme } = useTheme();
@@ -143,6 +144,8 @@ export function GameHeader() {
         </div>
 
         <div className="flex items-center gap-2">
+          {room && <ChatPopover />}
+
           {canShowWord && (
             <Dialog open={showWord} onOpenChange={setShowWord}>
               <DialogTrigger asChild>
