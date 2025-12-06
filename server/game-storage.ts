@@ -587,24 +587,25 @@ export function voteSpy(playerId: string, suspectId: string): Room | undefined {
 }
 
 export function forceProcessSpyVotes(roomId: string): Room | undefined {
-  const room = getRoom(roomId);
-  if (!room || room.phase !== "spy_voting") {
-    console.log(`forceProcessSpyVotes: Cannot process, phase is ${room?.phase}`);
+  const room = rooms.get(roomId);
+  if (!room) {
+    console.log(`forceProcessSpyVotes: Room not found - ${roomId}`);
     return undefined;
   }
 
-  console.log(`forceProcessSpyVotes: Forcing process with ${room.spyVotes.length} votes from ${room.players.length} players`);
+  if (room.phase !== "spy_voting") {
+    console.log(`forceProcessSpyVotes: Invalid phase - ${room.phase}`);
+    return undefined;
+  }
 
-  // Filter out votes from disconnected players
-  const activePlayers = room.players.filter(p => !p.disconnectedAt);
-  room.spyVotes = room.spyVotes.filter(v => {
-    const voter = room.players.find(p => p.id === v.voterId);
-    return voter && !voter.disconnectedAt;
-  });
+  console.log(`forceProcessSpyVotes: Processing votes for room ${roomId}, current votes: ${room.spyVotes.length}`);
 
-  console.log(`forceProcessSpyVotes: Processing with ${room.spyVotes.length} votes from ${activePlayers.length} active players`);
+  // Set phase start time before processing
+  room.phaseStartTime = Date.now();
+
   processSpyVotes(room);
-  console.log(`forceProcessSpyVotes: Done processing, phase is ${room.phase}`);
+  console.log(`forceProcessSpyVotes: After processing, phase is ${room.phase}`);
+
   return room;
 }
 
@@ -659,41 +660,42 @@ function processSpyVotes(room: Room): void {
     return;
   }
 
-  // Prioritize selecting a spy if there's a tie
-  let revealedId: string;
-  const spyInTopSuspects = topSuspects.find(id => {
-    const player = room.players.find(p => p.id === id);
-    return player?.role === "spy";
+  // Check if any top suspect is actually a spy
+  const spyRevealed = topSuspects.some((suspectId) => {
+    const suspect = room.players.find((p) => p.id === suspectId);
+    return suspect?.role === "spy";
   });
 
-  if (spyInTopSuspects) {
-    revealedId = spyInTopSuspects;
-  } else {
-    revealedId = topSuspects[Math.floor(Math.random() * topSuspects.length)];
-  }
+  console.log(`processSpyVotes: Spy revealed: ${spyRevealed}, top suspects: ${topSuspects}`);
 
-  // Add to revealed spies list instead of replacing
-  if (!room.revealedSpyIds.includes(revealedId)) {
-    room.revealedSpyIds.push(revealedId);
-  }
+  if (spyRevealed) {
+    room.revealedSpyIds = topSuspects.filter((id) => {
+      const suspect = room.players.find((p) => p.id === id);
+      return suspect?.role === "spy";
+    });
+    console.log(`processSpyVotes: Spy revealed (${room.players.find(p => room.revealedSpyIds.includes(p.id))?.name}), moving to spy_guess`);
 
-  const revealedPlayer = room.players.find((p) => p.id === revealedId);
-  const isSpy = revealedPlayer?.role === "spy";
+    // Award point to non-spy players who voted
+    room.players.forEach((p) => {
+      const voted = activeVotes.some(v => v.voterId === p.id);
+      if (p.role !== "spy" && voted) {
+        p.score = (p.score || 0) + 1;
+        console.log(`processSpyVotes: Awarded point to ${p.name} (voted and not spy)`);
+      }
+    });
 
-  // Reset spy guess data
-  room.spyGuess = undefined;
-  room.spyGuessCorrect = undefined;
-  room.guessValidationVotes = [];
-
-  if (isSpy) {
-    // Spy is revealed, move to spy guess phase
-    console.log(`processSpyVotes: Spy revealed (${revealedPlayer?.name}), moving to spy_guess`);
     room.phase = "spy_guess";
     room.phaseStartTime = Date.now();
   } else {
-    // Spy was not revealed, move to results phase directly
-    // No points awarded to spy for players voting wrong.
-    console.log(`processSpyVotes: Non-spy revealed (${revealedPlayer?.name}), moving to results`);
+    console.log(`processSpyVotes: Spy not revealed, moving to results`);
+    // Wrong suspect - spies win, award points to spies who voted
+    room.players.forEach((p) => {
+      const voted = activeVotes.some(v => v.voterId === p.id);
+      if (p.role === "spy" && voted) {
+        p.score = (p.score || 0) + 1;
+        console.log(`processSpyVotes: Awarded point to spy ${p.name} (voted)`);
+      }
+    });
     room.phase = "results";
     room.phaseStartTime = Date.now();
   }
