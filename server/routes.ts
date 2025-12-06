@@ -237,11 +237,16 @@ function startSpyVotingTimer(roomId: string): void {
   const SPY_VOTING_DURATION = 30000; // 30 seconds
   console.log(`startSpyVotingTimer: Starting timer for room ${roomId}`);
   
+  // Set phase start time
+  room.phaseStartTime = Date.now();
+  
+  // Broadcast initial timer
   broadcastToRoom(roomId, {
     type: "timer_update",
-    data: { timeRemaining: Math.ceil(SPY_VOTING_DURATION / 1000) },
+    data: { timeRemaining: 30 },
   });
   
+  // Countdown interval - broadcast every second
   const countdownInterval = setInterval(() => {
     const currentRoom = getRoom(roomId);
     if (!currentRoom || currentRoom.phase !== "spy_voting") {
@@ -257,6 +262,11 @@ function startSpyVotingTimer(roomId: string): void {
       type: "timer_update",
       data: { timeRemaining: remaining },
     });
+    
+    // Clear interval when time is up
+    if (remaining === 0) {
+      clearInterval(countdownInterval);
+    }
   }, 1000);
   
   const timer = setTimeout(() => {

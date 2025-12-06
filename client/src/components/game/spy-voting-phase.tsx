@@ -8,63 +8,21 @@ import { Progress } from "@/components/ui/progress";
 import { useGame } from "@/lib/game-context";
 import { playVoteSound, resumeAudioContext, playTimerWarningSound } from "@/lib/sounds";
 
-const SPY_VOTING_DURATION = 30; // 30 seconds for spy voting
-
 export function SpyVotingPhase() {
   const { room, currentPlayer, playerId, voteSpy, timerRemaining } = useGame();
   const [selectedSuspect, setSelectedSuspect] = useState<string | null>(null);
-  const [localTimer, setLocalTimer] = useState(SPY_VOTING_DURATION);
   const playedWarning = useRef(false);
-  const timerIntervalRef = useRef<NodeJS.Timeout | null>(null);
-  const phaseInitialized = useRef(false);
 
-  // Reset timer when entering spy_voting phase
+  // Play warning sound when timer reaches 10 seconds
   useEffect(() => {
-    if (room?.phase === "spy_voting" && !phaseInitialized.current) {
-      setLocalTimer(SPY_VOTING_DURATION);
-      playedWarning.current = false;
-      phaseInitialized.current = true;
-    } else if (room?.phase !== "spy_voting") {
-      phaseInitialized.current = false;
+    if (timerRemaining === 10 && !playedWarning.current) {
+      playTimerWarningSound();
+      playedWarning.current = true;
     }
-  }, [room?.phase]);
-
-  // Sync with server timer - but cap at spy voting duration
-  useEffect(() => {
-    if (timerRemaining > 0 && timerRemaining <= SPY_VOTING_DURATION) {
-      setLocalTimer(timerRemaining);
-      if (timerRemaining > 10) {
-        playedWarning.current = false;
-      }
+    if (timerRemaining > 10) {
+      playedWarning.current = false;
     }
   }, [timerRemaining]);
-
-  // Local countdown
-  useEffect(() => {
-    if (timerIntervalRef.current) {
-      clearInterval(timerIntervalRef.current);
-    }
-
-    if (room?.phase !== "spy_voting") return;
-
-    timerIntervalRef.current = setInterval(() => {
-      setLocalTimer((prev) => {
-        if (prev <= 0) return 0;
-        const newVal = prev - 1;
-        if (newVal === 10 && !playedWarning.current) {
-          playTimerWarningSound();
-          playedWarning.current = true;
-        }
-        return newVal;
-      });
-    }, 1000);
-
-    return () => {
-      if (timerIntervalRef.current) {
-        clearInterval(timerIntervalRef.current);
-      }
-    };
-  }, [room?.phase]);
 
   if (!room || !currentPlayer) return null;
 
@@ -99,15 +57,15 @@ export function SpyVotingPhase() {
         </Badge>
         
         {/* Timer display - always show during voting phase */}
-        {localTimer > 0 && (
+        {timerRemaining > 0 && (
           <div className="mt-4">
             <div className="flex items-center justify-center gap-2 mb-2">
-              <Clock className={`w-5 h-5 ${localTimer <= 10 ? 'text-destructive animate-pulse' : 'text-spy'}`} />
-              <span className={`text-xl font-bold tabular-nums ${localTimer <= 10 ? 'text-destructive' : ''}`}>
-                {Math.floor(localTimer / 60)}:{(localTimer % 60).toString().padStart(2, '0')}
+              <Clock className={`w-5 h-5 ${timerRemaining <= 10 ? 'text-destructive animate-pulse' : 'text-spy'}`} />
+              <span className={`text-xl font-bold tabular-nums ${timerRemaining <= 10 ? 'text-destructive' : ''}`}>
+                {Math.floor(timerRemaining / 60)}:{(timerRemaining % 60).toString().padStart(2, '0')}
               </span>
             </div>
-            <Progress value={(localTimer / 30) * 100} className="h-2 w-48 mx-auto" />
+            <Progress value={(timerRemaining / 30) * 100} className="h-2 w-48 mx-auto" />
           </div>
         )}
         
