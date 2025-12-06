@@ -15,14 +15,52 @@ export function SpyVotingPhase() {
   const [selectedSuspect, setSelectedSuspect] = useState<string | null>(null);
   const playedWarning = useRef(false);
   const [votingEnded, setVotingEnded] = useState(false);
+  const [localTimer, setLocalTimer] = useState(SPY_VOTING_DURATION);
+  const timerIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Always use server's timerRemaining directly - it's synced every second
-  const displayTimer = timerRemaining;
+  // Sync local timer with server timer when it updates
+  useEffect(() => {
+    if (timerRemaining > 0) {
+      console.log(`SpyVotingPhase: Syncing timer from server: ${timerRemaining}s`);
+      setLocalTimer(timerRemaining);
+    }
+  }, [timerRemaining]);
+
+  // Initialize timer when phase starts
+  useEffect(() => {
+    if (room?.phase === "spy_voting") {
+      console.log(`SpyVotingPhase: Phase started, initializing timer`);
+      setLocalTimer(SPY_VOTING_DURATION);
+      setVotingEnded(false);
+      playedWarning.current = false;
+
+      // Start local countdown
+      if (timerIntervalRef.current) {
+        clearInterval(timerIntervalRef.current);
+      }
+
+      timerIntervalRef.current = setInterval(() => {
+        setLocalTimer((prev) => {
+          if (prev <= 0) return 0;
+          return prev - 1;
+        });
+      }, 1000);
+    }
+
+    return () => {
+      if (timerIntervalRef.current) {
+        clearInterval(timerIntervalRef.current);
+      }
+    };
+  }, [room?.phase]);
+
+  // Use local timer for display (falls back to server timer if available)
+  const displayTimer = timerRemaining > 0 ? timerRemaining : localTimer;
 
   // Debug logging
   useEffect(() => {
-    console.log(`SpyVotingPhase: timerRemaining=${timerRemaining}, phase=${room?.phase}`);
-  }, [timerRemaining, room?.phase]);
+    console.log(`SpyVotingPhase: serverTimer=${timerRemaining}, localTimer=${localTimer}, display=${displayTimer}, phase=${room?.phase}`);
+  }, [timerRemaining, localTimer, displayTimer, room?.phase]);
 
   // Play warning sound when timer reaches 10 seconds
   useEffect(() => {

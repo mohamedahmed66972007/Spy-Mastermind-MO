@@ -397,12 +397,14 @@ function startSpyVotingTimer(roomId: string): void {
   };
   
   // Broadcast initial timer
-  broadcastTimer();
+  const initialBroadcast = broadcastTimer();
+  console.log(`startSpyVotingTimer: Initial broadcast sent, remaining=${Math.max(0, Math.ceil((SPY_VOTING_DURATION - 0) / 1000))}s`);
   
   // Countdown interval - broadcast every second
   const countdownInterval = setInterval(() => {
     const shouldContinue = broadcastTimer();
     if (!shouldContinue) {
+      console.log(`startSpyVotingTimer: Countdown complete, clearing interval`);
       clearInterval(countdownInterval);
     }
   }, 1000);
