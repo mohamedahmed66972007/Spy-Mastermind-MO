@@ -230,7 +230,7 @@ function startSpyVotingTimer(roomId: string): void {
   const room = getRoom(roomId);
   if (!room || room.phase !== "spy_voting") return;
   
-  const SPY_VOTING_DURATION = 60000; // 60 seconds
+  const SPY_VOTING_DURATION = 30000; // 30 seconds
   
   broadcastToRoom(roomId, {
     type: "timer_update",

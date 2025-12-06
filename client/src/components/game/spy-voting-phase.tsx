@@ -11,7 +11,7 @@ import { playVoteSound, resumeAudioContext, playTimerWarningSound } from "@/lib/
 export function SpyVotingPhase() {
   const { room, currentPlayer, playerId, voteSpy, timerRemaining } = useGame();
   const [selectedSuspect, setSelectedSuspect] = useState<string | null>(null);
-  const [localTimer, setLocalTimer] = useState(timerRemaining || 60);
+  const [localTimer, setLocalTimer] = useState(timerRemaining || 30);
   const playedWarning = useRef(false);
   const timerIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -84,16 +84,22 @@ export function SpyVotingPhase() {
           {totalVotes}/{totalPlayers} صوتوا
         </Badge>
         
-        {/* Timer display */}
-        {localTimer > 0 && !hasVoted && (
+        {/* Timer display - always show during voting phase */}
+        {localTimer > 0 && (
           <div className="mt-4">
             <div className="flex items-center justify-center gap-2 mb-2">
-              <Clock className="w-5 h-5 text-spy" />
-              <span className="text-xl font-bold tabular-nums">
+              <Clock className={`w-5 h-5 ${localTimer <= 10 ? 'text-destructive animate-pulse' : 'text-spy'}`} />
+              <span className={`text-xl font-bold tabular-nums ${localTimer <= 10 ? 'text-destructive' : ''}`}>
                 {Math.floor(localTimer / 60)}:{(localTimer % 60).toString().padStart(2, '0')}
               </span>
             </div>
-            <Progress value={(localTimer / 60) * 100} className="h-2 w-48 mx-auto" />
+            <Progress value={(localTimer / 30) * 100} className="h-2 w-48 mx-auto" />
+          </div>
+        )}
+        
+        {localTimer === 0 && (
+          <div className="mt-4 text-center">
+            <p className="text-destructive font-medium animate-pulse">انتهى الوقت - جاري معالجة الأصوات...</p>
           </div>
         )}
       </div>
