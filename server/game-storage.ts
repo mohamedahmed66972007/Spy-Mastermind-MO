@@ -544,19 +544,25 @@ export function checkAllPlayersDoneWithQuestions(room: Room): boolean {
 
 export function voteSpy(playerId: string, suspectId: string): Room | undefined {
   const room = getRoomByPlayerId(playerId);
-  if (!room) return undefined;
-  if (room.phase !== "spy_voting") return undefined;
+  if (!room || room.phase !== "spy_voting") return undefined;
 
-  // Prevent voting for yourself
-  if (playerId === suspectId) return undefined;
+  const player = room.players.find((p) => p.id === playerId);
+  if (!player) return undefined;
 
-  const existingVote = room.spyVotes.find((v) => v.voterId === playerId);
-  if (existingVote) return undefined;
+  // Remove any existing vote from this player
+  room.spyVotes = room.spyVotes.filter((v) => v.voterId !== playerId);
 
+  // Add new vote
   room.spyVotes.push({ voterId: playerId, suspectId });
 
-  // Check if all players have voted. If so, process votes.
-  if (room.spyVotes.length === room.players.length) {
+  // Check if all connected/active players have voted
+  const activePlayers = room.players.filter(p => !p.disconnected);
+  const activeVotes = room.spyVotes.filter(v => {
+    const voter = room.players.find(p => p.id === v.voterId);
+    return voter && !voter.disconnected;
+  });
+
+  if (activeVotes.length === activePlayers.length) {
     processSpyVotes(room);
   }
 
@@ -564,45 +570,49 @@ export function voteSpy(playerId: string, suspectId: string): Room | undefined {
 }
 
 export function forceProcessSpyVotes(roomId: string): Room | undefined {
-  const room = rooms.get(roomId);
-  if (!room) {
-    console.log(`forceProcessSpyVotes: Room not found - ${roomId}`);
-    return undefined;
-  }
-  if (room.phase !== "spy_voting") {
-    console.log(`forceProcessSpyVotes: Invalid phase - ${room.phase}`);
+  const room = getRoom(roomId);
+  if (!room || room.phase !== "spy_voting") {
+    console.log(`forceProcessSpyVotes: Cannot process, phase is ${room?.phase}`);
     return undefined;
   }
 
-  console.log(`forceProcessSpyVotes: Processing room ${roomId}, votes: ${room.spyVotes.length}`);
+  console.log(`forceProcessSpyVotes: Forcing process with ${room.spyVotes.length} votes from ${room.players.length} players`);
 
-  // If no one voted at all, move to results without revealing anyone
-  if (room.spyVotes.length === 0) {
-    console.log(`forceProcessSpyVotes: No votes, moving to results`);
-    room.phase = "results";
-    room.phaseStartTime = Date.now();
-    return room;
-  }
+  // Filter out votes from disconnected players
+  const activePlayers = room.players.filter(p => !p.disconnected);
+  room.spyVotes = room.spyVotes.filter(v => {
+    const voter = room.players.find(p => p.id === v.voterId);
+    return voter && !voter.disconnected;
+  });
 
-  // Process whatever votes we have
+  console.log(`forceProcessSpyVotes: Processing with ${room.spyVotes.length} votes from ${activePlayers.length} active players`);
   processSpyVotes(room);
-  console.log(`forceProcessSpyVotes: After processing, phase is ${room.phase}`);
+  console.log(`forceProcessSpyVotes: Done processing, phase is ${room.phase}`);
   return room;
 }
 
 function processSpyVotes(room: Room): void {
   console.log(`processSpyVotes: Starting with ${room.spyVotes.length} votes`);
-  
-  // If no votes at all, just move to results
-  if (room.spyVotes.length === 0) {
-    console.log(`processSpyVotes: No votes, moving to results`);
+
+  // Filter out votes from disconnected players
+  const activePlayers = room.players.filter(p => !p.disconnected);
+  const activeVotes = room.spyVotes.filter(v => {
+    const voter = room.players.find(p => p.id === v.voterId);
+    return voter && !voter.disconnected;
+  });
+
+  console.log(`processSpyVotes: Active votes: ${activeVotes.length} from ${activePlayers.length} players`);
+
+  // If no active votes at all, just move to results
+  if (activeVotes.length === 0) {
+    console.log(`processSpyVotes: No active votes, moving to results`);
     room.phase = "results";
     room.phaseStartTime = Date.now();
     return;
   }
 
-  const voteCounts = room.players.reduce((acc, player) => {
-    acc[player.id] = room.spyVotes.filter((v) => v.suspectId === player.id).length;
+  const voteCounts = activePlayers.reduce((acc, player) => {
+    acc[player.id] = activeVotes.filter((v) => v.suspectId === player.id).length;
     return acc;
   }, {} as Record<string, number>);
 
@@ -610,7 +620,7 @@ function processSpyVotes(room: Room): void {
 
   const maxVotes = Math.max(...Object.values(voteCounts), 0);
   console.log(`processSpyVotes: Max votes: ${maxVotes}`);
-  
+
   // If no one got any votes (shouldn't happen but let's be safe)
   if (maxVotes === 0) {
     console.log(`processSpyVotes: No one got votes, moving to results`);
@@ -670,7 +680,7 @@ function processSpyVotes(room: Room): void {
     room.phase = "results";
     room.phaseStartTime = Date.now();
   }
-  
+
   console.log(`processSpyVotes: Final phase is ${room.phase}`);
 }
 
