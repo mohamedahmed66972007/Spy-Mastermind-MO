@@ -339,8 +339,11 @@ function startCategoryVotingTimer(roomId: string): void {
     return true;
   };
   
-  // Broadcast initial timer
+  // Broadcast initial timer immediately
   broadcastTimer();
+  
+  // Broadcast again after a short delay to ensure it's received
+  setTimeout(() => broadcastTimer(), 100);
   
   // Countdown interval - broadcast every second
   countdownInterval = setInterval(() => {
@@ -396,9 +399,12 @@ function startSpyVotingTimer(roomId: string): void {
     return remaining > 0;
   };
   
-  // Broadcast initial timer
-  const initialBroadcast = broadcastTimer();
-  console.log(`startSpyVotingTimer: Initial broadcast sent, remaining=${Math.max(0, Math.ceil((SPY_VOTING_DURATION - 0) / 1000))}s`);
+  // Broadcast initial timer immediately
+  broadcastTimer();
+  console.log(`startSpyVotingTimer: Initial broadcast sent`);
+  
+  // Broadcast again after a short delay to ensure it's received
+  setTimeout(() => broadcastTimer(), 100);
   
   // Countdown interval - broadcast every second
   const countdownInterval = setInterval(() => {
@@ -532,8 +538,11 @@ function startSpyGuessTimer(roomId: string): void {
     return true;
   };
   
-  // Broadcast initial timer
+  // Broadcast initial timer immediately
   broadcastTimer();
+  
+  // Broadcast again after a short delay to ensure it's received
+  setTimeout(() => broadcastTimer(), 100);
   
   countdownInterval = setInterval(() => {
     broadcastTimer();
