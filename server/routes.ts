@@ -288,27 +288,42 @@ function forceEndCategoryVoting(roomId: string): void {
 }
 
 function forceEndSpyVoting(roomId: string): void {
+  console.log(`forceEndSpyVoting: Called for room ${roomId}`);
   const room = getRoom(roomId);
-  if (!room || room.phase !== "spy_voting") {
-    console.log(`forceEndSpyVoting: Invalid state - roomId=${roomId}, phase=${room?.phase}`);
+  if (!room) {
+    console.log(`forceEndSpyVoting: Room not found - ${roomId}`);
+    return;
+  }
+  
+  if (room.phase !== "spy_voting") {
+    console.log(`forceEndSpyVoting: Invalid phase - roomId=${roomId}, phase=${room.phase}`);
     return;
   }
 
   console.log(`forceEndSpyVoting: Processing votes for room ${roomId}, votes count: ${room.spyVotes.length}`);
   
+  // Clear the voting timer first
+  clearVotingTimer(roomId);
+  
   const updatedRoom = forceProcessSpyVotes(roomId);
   if (updatedRoom) {
-    console.log(`forceEndSpyVoting: Moved to phase ${updatedRoom.phase}`);
+    console.log(`forceEndSpyVoting: Successfully moved to phase ${updatedRoom.phase}`);
+    
+    // Broadcast the phase change
     broadcastToRoom(roomId, {
       type: "phase_changed",
       data: { phase: updatedRoom.phase, room: updatedRoom },
     });
     
-    // Start spy guess timer if we're in spy_guess phase
+    // Start appropriate timer based on new phase
     if (updatedRoom.phase === "spy_guess") {
       console.log(`forceEndSpyVoting: Starting spy guess timer`);
       startSpyGuessTimer(roomId);
+    } else if (updatedRoom.phase === "results") {
+      console.log(`forceEndSpyVoting: Moved directly to results`);
     }
+  } else {
+    console.log(`forceEndSpyVoting: Failed to process votes`);
   }
 }
 
@@ -328,7 +343,7 @@ function startSpyGuessTimer(roomId: string): void {
   const room = getRoom(roomId);
   if (!room || room.phase !== "spy_guess") return;
   
-  const SPY_GUESS_DURATION = 120000; // 120 seconds (2 minutes) for spy to guess
+  const SPY_GUESS_DURATION = 30000; // 30 seconds for spy to guess
   room.phaseStartTime = Date.now();
   
   broadcastToRoom(roomId, {

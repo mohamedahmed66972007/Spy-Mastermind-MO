@@ -12,7 +12,7 @@ import { playTimerWarningSound } from "@/lib/sounds";
 export function SpyGuessPhase() {
   const { room, currentPlayer, playerId, submitGuess, timerRemaining } = useGame();
   const [guess, setGuess] = useState("");
-  const [localTimer, setLocalTimer] = useState(timerRemaining || 120);
+  const [localTimer, setLocalTimer] = useState(timerRemaining || 30);
   const playedWarning = useRef(false);
   const timerIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -90,10 +90,10 @@ export function SpyGuessPhase() {
             <div className="flex items-center justify-center gap-2 mb-2">
               <Clock className={`w-5 h-5 ${localTimer <= 10 ? 'text-destructive animate-pulse' : 'text-spy'}`} />
               <span className={`text-xl font-bold tabular-nums ${localTimer <= 10 ? 'text-destructive' : ''}`}>
-                {Math.floor(localTimer / 60)}:{(localTimer % 60).toString().padStart(2, '0')}
+                {localTimer}
               </span>
             </div>
-            <Progress value={(localTimer / 120) * 100} className="h-2 w-48 mx-auto" />
+            <Progress value={(localTimer / 30) * 100} className="h-2 w-48 mx-auto" />
           </div>
         )}
         
