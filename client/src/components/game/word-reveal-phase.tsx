@@ -94,9 +94,11 @@ export function WordRevealPhase() {
                     <p className="text-4xl font-bold text-foreground">
                       {word}
                     </p>
-                    <p className="text-muted-foreground">
-                      {getCategoryName()}
-                    </p>
+                    {room.selectedCategory && (
+                      <p className="text-xl font-medium text-muted-foreground mt-2">
+                        {getCategoryName()}
+                      </p>
+                    )}
                   </>
                 )}
                 <EyeOff className="w-6 h-6 mx-auto text-muted-foreground mt-4" />
