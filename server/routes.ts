@@ -286,10 +286,6 @@ function forceEndSpyVoting(roomId: string): void {
       type: "phase_changed",
       data: { phase: room.phase, room },
     });
-    broadcastToRoom(roomId, {
-      type: "room_updated",
-      data: { room },
-    });
     // Start spy guess timer if we're in spy_guess phase
     if (room.phase === "spy_guess") {
       startSpyGuessTimer(roomId);
@@ -688,12 +684,9 @@ function handleMessage(ws: WebSocket, data: string): void {
       const prevPhase = getRoomByPlayerId(playerId)?.phase;
       const room = voteSpy(playerId, message.data.suspectId);
       if (room) {
-        broadcastToRoom(room.id, {
-          type: "room_updated",
-          data: { room },
-        });
         if (prevPhase === "spy_voting" && room.phase !== "spy_voting") {
           clearVotingTimer(room.id);
+          room.phaseStartTime = Date.now();
           broadcastToRoom(room.id, {
             type: "phase_changed",
             data: { phase: room.phase, room },
@@ -702,6 +695,11 @@ function handleMessage(ws: WebSocket, data: string): void {
           if (room.phase === "spy_guess") {
             startSpyGuessTimer(room.id);
           }
+        } else {
+          broadcastToRoom(room.id, {
+            type: "room_updated",
+            data: { room },
+          });
         }
       }
       break;

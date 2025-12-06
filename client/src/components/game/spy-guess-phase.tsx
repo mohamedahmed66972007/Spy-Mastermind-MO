@@ -60,6 +60,14 @@ export function SpyGuessPhase() {
   const isCurrentSpy = currentSpy?.id === playerId;
   const hasGuessed = !!room.spyGuess;
 
+  console.log('SpyGuessPhase:', {
+    phase: room.phase,
+    revealedSpies: revealedSpies.map(s => s.name),
+    isCurrentSpy,
+    hasGuessed,
+    spyGuess: room.spyGuess
+  });
+
   const handleSubmitGuess = () => {
     if (guess.trim()) {
       submitGuess(guess.trim());

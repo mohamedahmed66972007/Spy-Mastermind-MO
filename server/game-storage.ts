@@ -611,17 +611,20 @@ function processSpyVotes(room: Room): void {
   const revealedPlayer = room.players.find((p) => p.id === revealedId);
   const isSpy = revealedPlayer?.role === "spy";
 
+  // Reset spy guess data
+  room.spyGuess = undefined;
+  room.spyGuessCorrect = undefined;
+  room.guessValidationVotes = [];
+
   if (isSpy) {
     // Spy is revealed, move to spy guess phase
     room.phase = "spy_guess";
-    room.phaseStartTime = Date.now(); // Start timer for spy guess phase
-    // Ensure the spy guess phase timer is set
-    room.turnTimerEnd = Date.now() + 30000; // 30 seconds for spy guess
+    room.phaseStartTime = Date.now();
   } else {
     // Spy was not revealed, move to results phase directly
     // No points awarded to spy for players voting wrong.
     room.phase = "results";
-    room.phaseStartTime = Date.now(); // Start timer for results phase
+    room.phaseStartTime = Date.now();
   }
 }
 
