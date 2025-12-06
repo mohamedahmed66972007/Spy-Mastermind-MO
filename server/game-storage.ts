@@ -568,27 +568,49 @@ export function forceProcessSpyVotes(roomId: string): Room | undefined {
   if (!room) return undefined;
   if (room.phase !== "spy_voting") return undefined;
 
-  // If no one voted, skip to results
+  // If no one voted at all, move to results without revealing anyone
   if (room.spyVotes.length === 0) {
     room.phase = "results";
-    room.phaseStartTime = Date.now(); // Start timer for results phase
+    room.phaseStartTime = Date.now();
     return room;
   }
 
+  // Process whatever votes we have
   processSpyVotes(room);
   return room;
 }
 
 function processSpyVotes(room: Room): void {
+  // If no votes at all, just move to results
+  if (room.spyVotes.length === 0) {
+    room.phase = "results";
+    room.phaseStartTime = Date.now();
+    return;
+  }
+
   const voteCounts = room.players.reduce((acc, player) => {
     acc[player.id] = room.spyVotes.filter((v) => v.suspectId === player.id).length;
     return acc;
   }, {} as Record<string, number>);
 
-  const maxVotes = Math.max(...Object.values(voteCounts));
+  const maxVotes = Math.max(...Object.values(voteCounts), 0);
+  
+  // If no one got any votes (shouldn't happen but let's be safe)
+  if (maxVotes === 0) {
+    room.phase = "results";
+    room.phaseStartTime = Date.now();
+    return;
+  }
+
   const topSuspects = Object.entries(voteCounts)
-    .filter(([_, count]) => count === maxVotes)
+    .filter(([_, count]) => count === maxVotes && count > 0)
     .map(([id]) => id);
+
+  if (topSuspects.length === 0) {
+    room.phase = "results";
+    room.phaseStartTime = Date.now();
+    return;
+  }
 
   // Prioritize selecting a spy if there's a tie
   let revealedId: string;
