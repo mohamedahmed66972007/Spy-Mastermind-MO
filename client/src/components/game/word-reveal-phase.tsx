@@ -18,7 +18,7 @@ export function WordRevealPhase() {
     if (!room.selectedCategory) return "";
     
     // If external words, use the category directly
-    if (room.wordSource === "external") {
+    if (room.wordSource === "external" || room.externalWords) {
       return room.selectedCategory;
     }
     
@@ -34,17 +34,22 @@ export function WordRevealPhase() {
   };
 
   const handleInfoClick = () => {
-    if (word && !isSpy && room?.selectedCategory) {
+    if (word && !isSpy) {
       let categoryPrefix = "";
-      if (room.selectedCategory === "countries") {
-        categoryPrefix = "دولة ";
-      } else if (room.selectedCategory === "fruits_vegetables") {
-        categoryPrefix = "ثمرة ";
-      } else if (room.selectedCategory === "animals") {
-        categoryPrefix = "حيوان ";
-      } else if (room.selectedCategory === "cars") {
-        categoryPrefix = "سيارة ";
+      
+      // For system words, add category prefix
+      if (room?.wordSource !== "external" && !room?.externalWords) {
+        if (room?.selectedCategory === "countries") {
+          categoryPrefix = "دولة ";
+        } else if (room?.selectedCategory === "fruits_vegetables") {
+          categoryPrefix = "ثمرة ";
+        } else if (room?.selectedCategory === "animals") {
+          categoryPrefix = "حيوان ";
+        } else if (room?.selectedCategory === "cars") {
+          categoryPrefix = "سيارة ";
+        }
       }
+      
       const searchQuery = encodeURIComponent(categoryPrefix + word);
       window.open(`https://www.google.com/search?q=${searchQuery}`, "_blank");
     }
