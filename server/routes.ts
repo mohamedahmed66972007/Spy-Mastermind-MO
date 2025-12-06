@@ -826,10 +826,15 @@ function handleMessage(ws: WebSocket, data: string): void {
         });
         broadcastToRoom(room.id, {
           type: "phase_changed",
-          data: { phase: "category_voting", room },
+          data: { phase: room.phase, room },
         });
-        // Start category voting timer
-        startCategoryVotingTimer(room.id);
+        // Start appropriate timer based on phase
+        if (room.phase === "category_voting") {
+          startCategoryVotingTimer(room.id);
+        } else if (room.phase === "word_reveal") {
+          // Started with external words - go directly to word reveal
+          startWordRevealTimer(room.id);
+        }
       } else {
         sendToPlayer(playerId, {
           type: "error",

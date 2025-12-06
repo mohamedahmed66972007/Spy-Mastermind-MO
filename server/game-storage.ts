@@ -380,6 +380,10 @@ function startGameWithExternalWords(room: Room): void {
   room.turnTimerEnd = undefined;
 }
 
+export function shouldStartWordRevealTimer(room: Room): boolean {
+  return room.phase === "word_reveal";
+}
+
 export function voteCategory(playerId: string, category: string): Room | undefined {
   const room = getRoomByPlayerId(playerId);
   if (!room) return undefined;
