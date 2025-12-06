@@ -76,6 +76,7 @@ export interface Room {
   questions: Question[];
   roundNumber: number;
   spyGuess?: string;
+  spyGuessCorrect?: boolean;
   guessValidationVotes: { playerId: string; isCorrect: boolean }[];
   revealedSpyIds: string[];
   spyCount: number;

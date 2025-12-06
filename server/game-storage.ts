@@ -12,23 +12,41 @@ const SESSION_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes
 
 function normalizeArabicWord(word: string): string {
   let normalized = word.trim();
+  // Apply Unicode NFC normalization first
+  normalized = normalized.normalize('NFC');
+  // Remove zero-width characters
+  normalized = normalized.replace(/[\u200B-\u200F\u202A-\u202E\uFEFF]/g, '');
+  // Remove tashkeel (diacritical marks)
   normalized = normalized.replace(/[\u064B-\u065F\u0670]/g, '');
+  // Remove tatweel
   normalized = normalized.replace(/\u0640/g, '');
+  // Normalize spaces
   normalized = normalized.replace(/\s+/g, ' ');
-  normalized = normalized.replace(/[.,،؛:!?؟\-_'"«»()[\]{}]/g, '');
+  // Remove common punctuation (including Arabic and various quote styles)
+  normalized = normalized.replace(/[.,،؛:!?؟\-_'"«»()[\]{}""'']/g, '');
+  // Remove ال prefix
   normalized = normalized.replace(/^ال/, '');
+  // Normalize alef maksura to ya
   normalized = normalized.replace(/ى/g, 'ي');
+  // Normalize hamza variations
   normalized = normalized.replace(/[أإآ]/g, 'ا');
   normalized = normalized.replace(/ؤ/g, 'و');
   normalized = normalized.replace(/ئ/g, 'ي');
-  return normalized.trim();
+  // Normalize teh marbuta to heh
+  normalized = normalized.replace(/ة/g, 'ه');
+  return normalized.trim().toLowerCase();
 }
 
 function isGuessCorrect(guess: string, actualWord: string): boolean {
-  return normalizeArabicWord(guess) === normalizeArabicWord(actualWord);
+  const normalizedGuess = normalizeArabicWord(guess);
+  const normalizedActual = normalizeArabicWord(actualWord);
+  console.log(`[Guess Validation] Guess: "${guess}" -> "${normalizedGuess}", Actual: "${actualWord}" -> "${normalizedActual}", Match: ${normalizedGuess === normalizedActual}`);
+  return normalizedGuess === normalizedActual;
 }
 
 function processSystemGuessValidation(room: Room, guessIsCorrect: boolean): void {
+  room.spyGuessCorrect = guessIsCorrect;
+  
   room.players.forEach((p) => {
     if (p.role !== "spy") {
       const votedForAnySpy = room.spyVotes.find((v) => {
@@ -323,6 +341,7 @@ function selectCategoryAndStartWordReveal(room: Room): void {
   room.questionsAsked = 0;
   room.currentPlayerIndex = 0;
   room.spyGuess = undefined;
+  room.spyGuessCorrect = undefined;
   room.guessValidationVotes = [];
   // Initialize turn queue with all players in random order
   room.turnQueue = [...room.players].sort(() => Math.random() - 0.5).map(p => p.id);
@@ -664,6 +683,7 @@ export function nextRound(playerId: string): Room | undefined {
   room.spyWord = undefined;
   room.selectedCategory = undefined;
   room.spyGuess = undefined;
+  room.spyGuessCorrect = undefined;
   room.guessValidationVotes = [];
   room.revealedSpyIds = [];
   room.turnQueue = [];

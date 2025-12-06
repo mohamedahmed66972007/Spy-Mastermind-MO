@@ -8,16 +8,30 @@ import { Progress } from "@/components/ui/progress";
 import { useGame } from "@/lib/game-context";
 import { playVoteSound, resumeAudioContext, playTimerWarningSound } from "@/lib/sounds";
 
+const SPY_VOTING_DURATION = 30; // 30 seconds for spy voting
+
 export function SpyVotingPhase() {
   const { room, currentPlayer, playerId, voteSpy, timerRemaining } = useGame();
   const [selectedSuspect, setSelectedSuspect] = useState<string | null>(null);
-  const [localTimer, setLocalTimer] = useState(timerRemaining || 30);
+  const [localTimer, setLocalTimer] = useState(SPY_VOTING_DURATION);
   const playedWarning = useRef(false);
   const timerIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const phaseInitialized = useRef(false);
 
-  // Sync with server timer
+  // Reset timer when entering spy_voting phase
   useEffect(() => {
-    if (timerRemaining > 0) {
+    if (room?.phase === "spy_voting" && !phaseInitialized.current) {
+      setLocalTimer(SPY_VOTING_DURATION);
+      playedWarning.current = false;
+      phaseInitialized.current = true;
+    } else if (room?.phase !== "spy_voting") {
+      phaseInitialized.current = false;
+    }
+  }, [room?.phase]);
+
+  // Sync with server timer - but cap at spy voting duration
+  useEffect(() => {
+    if (timerRemaining > 0 && timerRemaining <= SPY_VOTING_DURATION) {
       setLocalTimer(timerRemaining);
       if (timerRemaining > 10) {
         playedWarning.current = false;

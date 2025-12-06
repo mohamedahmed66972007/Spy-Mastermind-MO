@@ -12,9 +12,12 @@ export function ResultsPhase() {
   const { room, currentPlayer, isHost, nextRound, playerId } = useGame();
   const soundPlayed = useRef(false);
 
-  const spyWon = room?.guessValidationVotes ? 
-    room.guessValidationVotes.filter((v) => v.isCorrect).length >
-    room.guessValidationVotes.filter((v) => !v.isCorrect).length : false;
+  const spyWon = room?.spyGuessCorrect !== undefined 
+    ? room.spyGuessCorrect 
+    : (room?.guessValidationVotes 
+        ? room.guessValidationVotes.filter((v) => v.isCorrect).length >
+          room.guessValidationVotes.filter((v) => !v.isCorrect).length 
+        : false);
 
   const isSpy = room?.revealedSpyIds?.includes(playerId || "") || false;
 
