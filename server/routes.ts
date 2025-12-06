@@ -856,8 +856,6 @@ function handleMessage(ws: WebSocket, data: string): void {
           });
           // Always start word reveal timer to transition to questioning
           startWordRevealTimer(room.id);
-          });
-          startWordRevealTimer(room.id);
         }
       }
       break;
