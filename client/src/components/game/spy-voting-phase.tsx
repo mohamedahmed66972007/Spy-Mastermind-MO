@@ -111,11 +111,7 @@ export function SpyVotingPhase() {
           </div>
         )}
         
-        {localTimer === 0 && (
-          <div className="mt-4 text-center">
-            <p className="text-destructive font-medium animate-pulse">انتهى الوقت - جاري معالجة الأصوات...</p>
-          </div>
-        )}
+        
       </div>
 
       <Card>
