@@ -1,15 +1,55 @@
-import { useState } from "react";
-import { Search, Send, AlertCircle } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
+import { Search, Send, AlertCircle, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Progress } from "@/components/ui/progress";
 import { useGame } from "@/lib/game-context";
+import { playTimerWarningSound } from "@/lib/sounds";
 
 export function SpyGuessPhase() {
-  const { room, currentPlayer, playerId, submitGuess } = useGame();
+  const { room, currentPlayer, playerId, submitGuess, timerRemaining } = useGame();
   const [guess, setGuess] = useState("");
+  const [localTimer, setLocalTimer] = useState(timerRemaining || 120);
+  const playedWarning = useRef(false);
+  const timerIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(() => {
+    if (timerRemaining > 0) {
+      setLocalTimer(timerRemaining);
+      if (timerRemaining > 10) {
+        playedWarning.current = false;
+      }
+    }
+  }, [timerRemaining]);
+
+  useEffect(() => {
+    if (timerIntervalRef.current) {
+      clearInterval(timerIntervalRef.current);
+    }
+
+    if (room?.phase !== "spy_guess") return;
+
+    timerIntervalRef.current = setInterval(() => {
+      setLocalTimer((prev) => {
+        if (prev <= 0) return 0;
+        const newVal = prev - 1;
+        if (newVal === 10 && !playedWarning.current) {
+          playTimerWarningSound();
+          playedWarning.current = true;
+        }
+        return newVal;
+      });
+    }, 1000);
+
+    return () => {
+      if (timerIntervalRef.current) {
+        clearInterval(timerIntervalRef.current);
+      }
+    };
+  }, [room?.phase]);
 
   if (!room || !currentPlayer) return null;
 
@@ -36,6 +76,24 @@ export function SpyGuessPhase() {
         <p className="text-muted-foreground">
           تم الكشف عن الجاسوس - الآن فرصته الأخيرة للفوز
         </p>
+        
+        {localTimer > 0 && !hasGuessed && (
+          <div className="mt-4">
+            <div className="flex items-center justify-center gap-2 mb-2">
+              <Clock className={`w-5 h-5 ${localTimer <= 10 ? 'text-destructive animate-pulse' : 'text-spy'}`} />
+              <span className={`text-xl font-bold tabular-nums ${localTimer <= 10 ? 'text-destructive' : ''}`}>
+                {Math.floor(localTimer / 60)}:{(localTimer % 60).toString().padStart(2, '0')}
+              </span>
+            </div>
+            <Progress value={(localTimer / 120) * 100} className="h-2 w-48 mx-auto" />
+          </div>
+        )}
+        
+        {localTimer === 0 && !hasGuessed && (
+          <div className="mt-4 text-center">
+            <p className="text-destructive font-medium animate-pulse">انتهى الوقت - لم يتم التخمين...</p>
+          </div>
+        )}
       </div>
 
       <Card className="border-spy">

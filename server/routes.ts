@@ -291,7 +291,7 @@ function startSpyGuessTimer(roomId: string): void {
   const room = getRoom(roomId);
   if (!room || room.phase !== "spy_guess") return;
   
-  const SPY_GUESS_DURATION = 30000; // 30 seconds for spy to guess
+  const SPY_GUESS_DURATION = 120000; // 120 seconds (2 minutes) for spy to guess
   
   broadcastToRoom(roomId, {
     type: "timer_update",

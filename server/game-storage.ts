@@ -564,13 +564,9 @@ function processSpyVotes(room: Room): void {
     // Move to spy guess phase
     room.phase = "spy_guess";
   } else {
-    // Award 1 point to all spies since civilians voted wrong
-    room.players.forEach((p) => {
-      if (p.role === "spy") {
-        p.score = (p.score || 0) + 1;
-      }
-    });
-    // If wrong person was voted, move to results
+    // Spy does NOT get points when players vote wrong
+    // Only spy guessing the word correctly gives spy points
+    // Move to results with no spy points
     room.phase = "results";
   }
 }
