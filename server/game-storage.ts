@@ -398,7 +398,7 @@ export function answerQuestion(playerId: string, answer: string): { room: Room; 
   const turnAdvanced = room.currentTurnPlayerId !== previousTurnPlayerId || room.phase !== previousPhase;
 
   // If the phase has changed to spy_voting, reset the timer
-  if (room.phase === "spy_voting") {
+  if ((room.phase as string) === "spy_voting") {
     room.turnTimerEnd = undefined; // Reset timer for spy voting
     room.phaseStartTime = Date.now(); // Start timer for spy voting phase
   }
@@ -443,7 +443,7 @@ export function forceEndAskingPhase(roomId: string): Room | undefined {
   advanceToNextTurn(room);
 
   // If the phase has changed to spy_voting, reset the timer
-  if (room.phase === "spy_voting") {
+  if ((room.phase as string) === "spy_voting") {
     room.turnTimerEnd = undefined; // Reset timer for spy voting
     room.phaseStartTime = Date.now(); // Start timer for spy voting phase
   }
@@ -467,7 +467,7 @@ export function forceEndAnsweringPhase(roomId: string): Room | undefined {
   advanceToNextTurn(room);
 
   // If the phase has changed to spy_voting, reset the timer
-  if (room.phase === "spy_voting") {
+  if ((room.phase as string) === "spy_voting") {
     room.turnTimerEnd = undefined; // Reset timer for spy voting
     room.phaseStartTime = Date.now(); // Start timer for spy voting phase
   }
@@ -542,12 +542,23 @@ export function checkAllPlayersDoneWithQuestions(room: Room): boolean {
   );
 }
 
+const SPY_VOTING_DURATION_MS = 30000; // 30 seconds
+
 export function voteSpy(playerId: string, suspectId: string): Room | undefined {
   const room = getRoomByPlayerId(playerId);
   if (!room || room.phase !== "spy_voting") return undefined;
 
   const player = room.players.find((p) => p.id === playerId);
   if (!player) return undefined;
+
+  // Check if voting time has expired
+  if (room.phaseStartTime) {
+    const elapsed = Date.now() - room.phaseStartTime;
+    if (elapsed >= SPY_VOTING_DURATION_MS) {
+      console.log(`voteSpy: Voting time expired for player ${player.name}, elapsed=${elapsed}ms`);
+      return undefined; // Return undefined to indicate vote rejected - time expired
+    }
+  }
 
   // Remove any existing vote from this player
   room.spyVotes = room.spyVotes.filter((v) => v.voterId !== playerId);
@@ -556,10 +567,10 @@ export function voteSpy(playerId: string, suspectId: string): Room | undefined {
   room.spyVotes.push({ voterId: playerId, suspectId });
 
   // Check if all connected/active players have voted
-  const activePlayers = room.players.filter(p => !p.disconnected);
+  const activePlayers = room.players.filter(p => !p.disconnectedAt);
   const activeVotes = room.spyVotes.filter(v => {
     const voter = room.players.find(p => p.id === v.voterId);
-    return voter && !voter.disconnected;
+    return voter && !voter.disconnectedAt;
   });
 
   if (activeVotes.length === activePlayers.length) {
@@ -579,10 +590,10 @@ export function forceProcessSpyVotes(roomId: string): Room | undefined {
   console.log(`forceProcessSpyVotes: Forcing process with ${room.spyVotes.length} votes from ${room.players.length} players`);
 
   // Filter out votes from disconnected players
-  const activePlayers = room.players.filter(p => !p.disconnected);
+  const activePlayers = room.players.filter(p => !p.disconnectedAt);
   room.spyVotes = room.spyVotes.filter(v => {
     const voter = room.players.find(p => p.id === v.voterId);
-    return voter && !voter.disconnected;
+    return voter && !voter.disconnectedAt;
   });
 
   console.log(`forceProcessSpyVotes: Processing with ${room.spyVotes.length} votes from ${activePlayers.length} active players`);
@@ -595,10 +606,10 @@ function processSpyVotes(room: Room): void {
   console.log(`processSpyVotes: Starting with ${room.spyVotes.length} votes`);
 
   // Filter out votes from disconnected players
-  const activePlayers = room.players.filter(p => !p.disconnected);
+  const activePlayers = room.players.filter(p => !p.disconnectedAt);
   const activeVotes = room.spyVotes.filter(v => {
     const voter = room.players.find(p => p.id === v.voterId);
-    return voter && !voter.disconnected;
+    return voter && !voter.disconnectedAt;
   });
 
   console.log(`processSpyVotes: Active votes: ${activeVotes.length} from ${activePlayers.length} players`);

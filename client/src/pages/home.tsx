@@ -217,9 +217,9 @@ export default function Home() {
           <Card className="text-center">
             <CardContent className="pt-6">
               <div className="w-8 h-8 mx-auto mb-2 bg-primary rounded-full flex items-center justify-center">
-                <span className="text-primary-foreground font-bold text-xs">60</span>
+                <span className="text-primary-foreground font-bold text-xs">30</span>
               </div>
-              <p className="text-sm text-muted-foreground">60 ثانية لكل دور</p>
+              <p className="text-sm text-muted-foreground">30 ثانية للتصويت</p>
             </CardContent>
           </Card>
           <Card className="text-center">

@@ -8,48 +8,45 @@ import { Progress } from "@/components/ui/progress";
 import { useGame } from "@/lib/game-context";
 import { playVoteSound, resumeAudioContext, playTimerWarningSound } from "@/lib/sounds";
 
+const SPY_VOTING_DURATION = 30; // 30 seconds
+
 export function SpyVotingPhase() {
   const { room, currentPlayer, playerId, voteSpy, timerRemaining } = useGame();
   const [selectedSuspect, setSelectedSuspect] = useState<string | null>(null);
   const playedWarning = useRef(false);
-  const [localTimer, setLocalTimer] = useState(timerRemaining); // Initialize with server timer
+  const [votingEnded, setVotingEnded] = useState(false);
+
+  // Always use server's timerRemaining directly - it's synced every second
+  const displayTimer = timerRemaining;
 
   // Play warning sound when timer reaches 10 seconds
   useEffect(() => {
-    if (timerRemaining === 10 && !playedWarning.current) {
+    if (displayTimer === 10 && !playedWarning.current) {
       playTimerWarningSound();
       playedWarning.current = true;
     }
-    if (timerRemaining > 10) {
+    if (displayTimer > 10) {
       playedWarning.current = false;
     }
-  }, [timerRemaining]);
+  }, [displayTimer]);
 
-  // Reset local timer when server sends timer update
+  // Mark voting as ended when timer reaches 0
   useEffect(() => {
-    setLocalTimer(timerRemaining);
-    if (timerRemaining > 10) {
+    if (displayTimer === 0 && room?.phase === "spy_voting") {
+      setVotingEnded(true);
+    }
+    // Reset when phase changes or timer is reset
+    if (displayTimer > 0) {
+      setVotingEnded(false);
+    }
+  }, [displayTimer, room?.phase]);
+
+  // Reset state when entering this phase
+  useEffect(() => {
+    if (room?.phase === "spy_voting") {
+      setVotingEnded(false);
       playedWarning.current = false;
     }
-  }, [timerRemaining]);
-
-  // Countdown interval - only run when phase is spy_voting
-  useEffect(() => {
-    if (room?.phase !== "spy_voting") return;
-
-    const interval = setInterval(() => {
-      setLocalTimer((prev) => {
-        if (prev <= 0) return 0;
-        const newVal = prev - 1;
-        if (newVal === 10 && !playedWarning.current) {
-          playTimerWarningSound();
-          playedWarning.current = true;
-        }
-        return newVal;
-      });
-    }, 1000);
-
-    return () => clearInterval(interval);
   }, [room?.phase]);
 
 
@@ -59,13 +56,16 @@ export function SpyVotingPhase() {
   const totalVotes = room.spyVotes.length;
   const totalPlayers = room.players.length;
 
+  // Check if voting is still allowed (timer > 0 and not ended)
+  const canVote = !hasVoted && !votingEnded && displayTimer > 0;
+
   const voteCounts = room.players.reduce((acc, player) => {
     acc[player.id] = room.spyVotes.filter((v) => v.suspectId === player.id).length;
     return acc;
   }, {} as Record<string, number>);
 
   const handleVote = () => {
-    if (selectedSuspect && !hasVoted) {
+    if (selectedSuspect && canVote) {
       resumeAudioContext();
       playVoteSound();
       voteSpy(selectedSuspect);
@@ -86,17 +86,18 @@ export function SpyVotingPhase() {
         </Badge>
 
         {/* Timer display - always show during voting phase */}
-        {localTimer > 0 && (
-          <div className="mt-4">
-            <div className="flex items-center justify-center gap-2 mb-2">
-              <Clock className={`w-5 h-5 ${localTimer <= 10 ? 'text-destructive animate-pulse' : 'text-primary'}`} />
-              <span className={`text-xl font-bold tabular-nums ${localTimer <= 10 ? 'text-destructive' : ''}`}>
-                {Math.floor(localTimer / 60)}:{(localTimer % 60).toString().padStart(2, '0')}
-              </span>
-            </div>
-            <Progress value={(localTimer / 30) * 100} className="h-2 w-48 mx-auto" />
+        <div className="mt-4">
+          <div className="flex items-center justify-center gap-2 mb-2">
+            <Clock className={`w-5 h-5 ${displayTimer <= 10 ? 'text-destructive animate-pulse' : 'text-primary'}`} />
+            <span className={`text-xl font-bold tabular-nums ${displayTimer <= 10 ? 'text-destructive' : ''}`}>
+              {Math.floor(displayTimer / 60)}:{(displayTimer % 60).toString().padStart(2, '0')}
+            </span>
           </div>
-        )}
+          <Progress value={(displayTimer / SPY_VOTING_DURATION) * 100} className="h-2 w-48 mx-auto" />
+          {votingEnded && !hasVoted && (
+            <p className="text-destructive text-sm mt-2 animate-pulse">انتهى وقت التصويت</p>
+          )}
+        </div>
 
 
       </div>
@@ -122,8 +123,8 @@ export function SpyVotingPhase() {
                   isSelected
                     ? "border-spy ring-2 ring-spy/20 bg-spy/5"
                     : "border-border hover-elevate"
-                } ${hasVoted || isMe ? "opacity-60 pointer-events-none" : "cursor-pointer"}`}
-                onClick={() => !hasVoted && !isMe && setSelectedSuspect(player.id)}
+                } ${!canVote || isMe ? "opacity-60 pointer-events-none" : "cursor-pointer"}`}
+                onClick={() => canVote && !isMe && setSelectedSuspect(player.id)}
                 data-testid={`vote-player-${player.id}`}
               >
                 <div className="flex items-center justify-between gap-4">
@@ -150,7 +151,7 @@ export function SpyVotingPhase() {
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
-                    {isSelected && !hasVoted && (
+                    {isSelected && canVote && (
                       <Check className="w-5 h-5 text-spy" />
                     )}
                   </div>
@@ -166,11 +167,11 @@ export function SpyVotingPhase() {
         </CardContent>
       </Card>
 
-      {!hasVoted && (
+      {canVote && (
         <Button
           size="lg"
           className="w-full min-h-14 text-lg gap-2 bg-spy hover:bg-spy/90"
-          disabled={!selectedSuspect}
+          disabled={!selectedSuspect || votingEnded}
           onClick={handleVote}
           data-testid="button-submit-vote"
         >
@@ -183,6 +184,14 @@ export function SpyVotingPhase() {
         <div className="text-center">
           <p className="text-muted-foreground animate-pulse">
             في انتظار تصويت باقي اللاعبين...
+          </p>
+        </div>
+      )}
+
+      {votingEnded && !hasVoted && (
+        <div className="text-center">
+          <p className="text-destructive">
+            انتهى وقت التصويت - لم تحصل على نقطة
           </p>
         </div>
       )}

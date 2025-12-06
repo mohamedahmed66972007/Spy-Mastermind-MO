@@ -63,6 +63,30 @@ function clearRoomTimer(roomId: string): void {
   }
 }
 
+const SPY_VOTING_DURATION_MS = 30000;
+const SPY_GUESS_DURATION_MS = 30000;
+const CATEGORY_VOTING_DURATION_MS = 30000;
+
+function computeTimerRemaining(room: Room): number {
+  if (!room.phaseStartTime) return 0;
+  
+  let duration = 0;
+  if (room.phase === "spy_voting") {
+    duration = SPY_VOTING_DURATION_MS;
+  } else if (room.phase === "spy_guess") {
+    duration = SPY_GUESS_DURATION_MS;
+  } else if (room.phase === "category_voting") {
+    duration = CATEGORY_VOTING_DURATION_MS;
+  } else if (room.phase === "questioning" && room.turnTimerEnd) {
+    return Math.max(0, Math.ceil((room.turnTimerEnd - Date.now()) / 1000));
+  } else {
+    return 0;
+  }
+  
+  const elapsed = Date.now() - room.phaseStartTime;
+  return Math.max(0, Math.ceil((duration - elapsed) / 1000));
+}
+
 function startWordRevealTimer(roomId: string): void {
   clearRoomTimer(roomId);
   
@@ -551,6 +575,15 @@ function handleMessage(ws: WebSocket, data: string): void {
         type: "room_updated",
         data: { room: result.room },
       }, result.playerId);
+      
+      // Send current timer state to reconnected player
+      const timerRemaining = computeTimerRemaining(result.room);
+      if (timerRemaining > 0) {
+        sendToPlayer(result.playerId, {
+          type: "timer_update",
+          data: { timeRemaining: timerRemaining },
+        });
+      }
       break;
     }
 
