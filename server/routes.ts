@@ -113,6 +113,13 @@ function startWordRevealTimer(roomId: string): void {
       });
       // Start turn timer for first player
       startTurnTimer(roomId);
+      
+      // Broadcast initial timer
+      const timerRemaining = computeTimerRemaining(room);
+      broadcastToRoom(roomId, {
+        type: "timer_update",
+        data: { timeRemaining: timerRemaining },
+      });
     }
     roomTimers.delete(roomId);
   }, 10000);
@@ -846,6 +853,9 @@ function handleMessage(ws: WebSocket, data: string): void {
           broadcastToRoom(room.id, {
             type: "phase_changed",
             data: { phase: "word_reveal", room },
+          });
+          // Always start word reveal timer to transition to questioning
+          startWordRevealTimer(room.id);
           });
           startWordRevealTimer(room.id);
         }

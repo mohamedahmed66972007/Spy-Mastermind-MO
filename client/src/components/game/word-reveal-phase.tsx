@@ -82,6 +82,9 @@ export function WordRevealPhase() {
                       {room.selectedCategory === "fruits_vegetables" && "خضروات وفواكه"}
                       {room.selectedCategory === "animals" && "حيوان"}
                       {room.selectedCategory === "cars" && "سيارة"}
+                      {room.externalWords && room.externalWords.category && (
+                        <span>{room.externalWords.category}</span>
+                      )}
                     </p>
                   </>
                 )}

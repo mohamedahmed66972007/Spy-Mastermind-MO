@@ -407,18 +407,25 @@ export function forceSelectCategoryAndStartWordReveal(roomId: string): Room | un
 }
 
 function selectCategoryAndStartWordReveal(room: Room): void {
-  const voteCounts = categories.reduce((acc, cat) => {
-    acc[cat.id] = room.categoryVotes.filter((v) => v.category === cat.id).length;
-    return acc;
-  }, {} as Record<string, number>);
+  // Check if using external words
+  if (room.wordSource === "external" && room.externalWords) {
+    room.currentWord = room.externalWords.playerWord;
+    room.spyWord = room.externalWords.spyWord;
+    room.selectedCategory = room.externalWords.category;
+  } else {
+    const voteCounts = categories.reduce((acc, cat) => {
+      acc[cat.id] = room.categoryVotes.filter((v) => v.category === cat.id).length;
+      return acc;
+    }, {} as Record<string, number>);
 
-  const maxVotes = Math.max(...Object.values(voteCounts));
-  const topCategories = Object.entries(voteCounts)
-    .filter(([_, count]) => count === maxVotes)
-    .map(([cat]) => cat);
+    const maxVotes = Math.max(...Object.values(voteCounts));
+    const topCategories = Object.entries(voteCounts)
+      .filter(([_, count]) => count === maxVotes)
+      .map(([cat]) => cat);
 
-  room.selectedCategory = topCategories[Math.floor(Math.random() * topCategories.length)];
-  room.currentWord = getRandomWord(room.selectedCategory);
+    room.selectedCategory = topCategories[Math.floor(Math.random() * topCategories.length)];
+    room.currentWord = getRandomWord(room.selectedCategory);
+  }
 
   const spyCount = room.spyCount || getSpyCountForPlayers(room.players.length);
   // Fisher-Yates shuffle for better randomization
@@ -429,7 +436,7 @@ function selectCategoryAndStartWordReveal(room: Room): void {
   }
   const spyIds = shuffledPlayers.slice(0, spyCount).map((p) => p.id);
 
-  if (room.gameMode === "blind") {
+  if (room.gameMode === "blind" && !room.externalWords) {
     room.spyWord = getSimilarWord(room.selectedCategory, room.currentWord);
   }
 
@@ -909,6 +916,28 @@ export function nextRound(playerId: string): Room | undefined {
 }
 
 export function startQuestioningPhase(roomId: string): Room | undefined {
+  const room = rooms.get(roomId);
+  if (!room) return undefined;
+  if (room.phase !== "word_reveal") return undefined;
+
+  room.phase = "questioning";
+  room.phaseStartTime = Date.now();
+  
+  // Initialize turn queue if not already set
+  if (!room.turnQueue || room.turnQueue.length === 0) {
+    room.turnQueue = [...room.players].sort(() => Math.random() - 0.5).map(p => p.id);
+  }
+  
+  // Set first player's turn
+  if (!room.currentTurnPlayerId && room.turnQueue.length > 0) {
+    room.currentTurnPlayerId = room.turnQueue[0];
+    room.turnTimerEnd = Date.now() + 60000; // 60 seconds for asking
+  }
+  
+  return room;
+}
+
+export function forceStartQuestioningPhase(roomId: string): Room | undefined {
   const room = rooms.get(roomId);
   if (!room) return undefined;
   if (room.phase !== "word_reveal") return undefined;
