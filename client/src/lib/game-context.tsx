@@ -204,12 +204,19 @@ export function GameProvider({ children }: { children: ReactNode }) {
         setRoom(message.data.room);
         break;
       case "player_kicked":
-        setRoom(message.data.room);
-        // If current player was kicked, clear session and redirect
-        if (message.data.playerId === playerId) {
+        // If current player was kicked
+        if (message.data.isYou || message.data.playerId === playerId) {
+          setError("تم طردك من الغرفة من قبل القائد");
           clearSession();
           setRoom(null);
           setPlayerId(null);
+          // Close connection
+          if (socketRef.current) {
+            socketRef.current.close(1000, "Kicked from room");
+          }
+        } else {
+          // Another player was kicked
+          setRoom(message.data.room);
         }
         break;
       case "timer_update":

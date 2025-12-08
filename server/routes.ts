@@ -1147,10 +1147,20 @@ function handleMessage(ws: WebSocket, data: string): void {
         // Notify kicked player
         if (kickedClient && kickedClient.readyState === WebSocket.OPEN) {
           kickedClient.send(JSON.stringify({
-            type: "error",
-            data: { message: "تم طردك من الغرفة" },
+            type: "player_kicked",
+            data: { 
+              playerId: message.data.playerId, 
+              playerName: kickedPlayerName,
+              room,
+              isYou: true
+            },
           }));
-          kickedClient.close();
+          // Wait a bit before closing to ensure message is delivered
+          setTimeout(() => {
+            if (kickedClient.readyState === WebSocket.OPEN) {
+              kickedClient.close();
+            }
+          }, 500);
         }
         
         clients.delete(message.data.playerId);

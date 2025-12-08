@@ -180,7 +180,7 @@ export type ServerMessage =
   | { type: "turn_changed"; data: { currentPlayerId: string; room: Room } }
   | { type: "external_words_set"; data: { success: boolean } }
   | { type: "spectator_joined"; data: { room: Room } }
-  | { type: "player_kicked"; data: { playerId: string; playerName: string; room: Room } }
+  | { type: "player_kicked"; data: { playerId: string; playerName: string; room: Room; isYou?: boolean } }
   | { type: "host_transferred"; data: { newHostId: string; room: Room } };
 
 export function getSpyCountForPlayers(playerCount: number): number {
