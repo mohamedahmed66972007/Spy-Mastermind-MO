@@ -56,6 +56,8 @@ interface GameContextType {
   leaveRoom: () => void;
   clearError: () => void;
   doneWithQuestions: () => void;
+  transferHost: (newHostId: string) => void;
+  kickPlayer: (playerId: string) => void;
 }
 
 const GameContext = createContext<GameContextType | null>(null);
@@ -197,6 +199,18 @@ export function GameProvider({ children }: { children: ReactNode }) {
         break;
       case "player_left":
         setRoom(message.data.room);
+        break;
+      case "host_transferred":
+        setRoom(message.data.room);
+        break;
+      case "player_kicked":
+        setRoom(message.data.room);
+        // If current player was kicked, clear session and redirect
+        if (message.data.playerId === playerId) {
+          clearSession();
+          setRoom(null);
+          setPlayerId(null);
+        }
         break;
       case "timer_update":
         console.log(`Timer update received: ${message.data.timeRemaining}s`);
@@ -348,6 +362,20 @@ export function GameProvider({ children }: { children: ReactNode }) {
     setError(null);
   }, []);
 
+  const transferHost = useCallback(
+    (newHostId: string) => {
+      sendMessage({ type: "transfer_host", data: { newHostId } });
+    },
+    [sendMessage]
+  );
+
+  const kickPlayer = useCallback(
+    (playerIdToKick: string) => {
+      sendMessage({ type: "kick_player", data: { playerId: playerIdToKick } });
+    },
+    [sendMessage]
+  );
+
   const currentPlayer = room?.players.find((p) => p.id === playerId) || null;
   const isHost = currentPlayer?.isHost || false;
 
@@ -382,6 +410,8 @@ export function GameProvider({ children }: { children: ReactNode }) {
         leaveRoom,
         clearError,
         doneWithQuestions,
+        transferHost,
+        kickPlayer,
       }}
     >
       {children}

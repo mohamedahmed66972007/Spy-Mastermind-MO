@@ -161,7 +161,9 @@ export type WebSocketMessage =
   | { type: "update_word_source"; data: { mode: WordSourceMode } }
   | { type: "set_external_words"; data: { roomCode: string; token: string; category: string; playerWord: string; spyWord: string } }
   | { type: "join_spectator"; data: { roomCode: string; token: string } }
-  | { type: "update_game_settings"; data: { settings: Partial<GameSettings> } };
+  | { type: "update_game_settings"; data: { settings: Partial<GameSettings> } }
+  | { type: "transfer_host"; data: { newHostId: string } }
+  | { type: "kick_player"; data: { playerId: string } };
 
 export type ServerMessage =
   | { type: "room_created"; data: { room: Room; playerId: string; sessionToken: string } }
@@ -177,7 +179,9 @@ export type ServerMessage =
   | { type: "spy_revealed"; data: { spyIds: string[]; room: Room } }
   | { type: "turn_changed"; data: { currentPlayerId: string; room: Room } }
   | { type: "external_words_set"; data: { success: boolean } }
-  | { type: "spectator_joined"; data: { room: Room } };
+  | { type: "spectator_joined"; data: { room: Room } }
+  | { type: "player_kicked"; data: { playerId: string; playerName: string; room: Room } }
+  | { type: "host_transferred"; data: { newHostId: string; room: Room } };
 
 export function getSpyCountForPlayers(playerCount: number): number {
   if (playerCount <= 6) return 1;

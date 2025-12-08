@@ -1122,6 +1122,45 @@ function handleMessage(ws: WebSocket, data: string): void {
       }
       break;
     }
+
+    case "transfer_host": {
+      if (!playerId) return;
+      const room = transferHost(playerId, message.data.newHostId);
+      if (room) {
+        broadcastToRoom(room.id, {
+          type: "host_transferred",
+          data: { newHostId: message.data.newHostId, room },
+        });
+      }
+      break;
+    }
+
+    case "kick_player": {
+      if (!playerId) return;
+      const result = kickPlayer(playerId, message.data.playerId);
+      if (result) {
+        const { room, kickedPlayerName } = result;
+        const kickedClient = clients.get(message.data.playerId);
+        
+        // Notify kicked player
+        if (kickedClient && kickedClient.readyState === WebSocket.OPEN) {
+          kickedClient.send(JSON.stringify({
+            type: "error",
+            data: { message: "تم طردك من الغرفة" },
+          }));
+          kickedClient.close();
+        }
+        
+        clients.delete(message.data.playerId);
+        
+        // Notify remaining players
+        broadcastToRoom(room.id, {
+          type: "player_kicked",
+          data: { playerId: message.data.playerId, playerName: kickedPlayerName, room },
+        });
+      }
+      break;
+    }
   }
 }
 

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { Crown, Check, Clock, Play, Settings, Users, Minus, Plus, Bot, UsersRound, Eye, Copy, Link } from "lucide-react";
+import { Crown, Check, Clock, Play, Settings, Users, Minus, Plus, Bot, UsersRound, Eye, Copy, Link, UserCog, UserX, MoreVertical } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -8,10 +8,16 @@ import { Input } from "@/components/ui/input";
 import { useGame } from "@/lib/game-context";
 import { useToast } from "@/hooks/use-toast";
 import { Slider } from "@/components/ui/slider";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { getMinPlayersForStart, getMaxPlayers, getSpyCountForPlayers, defaultGameSettings } from "@shared/schema";
 
 export function LobbyPhase() {
-  const { room, currentPlayer, isHost, toggleReady, startGame, updateSpyCount, updateGuessValidationMode, updateWordSource, updateGameSettings: updateServerSettings } = useGame();
+  const { room, currentPlayer, isHost, toggleReady, startGame, updateSpyCount, updateGuessValidationMode, updateWordSource, updateGameSettings: updateServerSettings, transferHost, kickPlayer } = useGame();
   const { toast } = useToast();
   const [copiedRoom, setCopiedRoom] = useState(false);
   const [copiedExternal, setCopiedExternal] = useState(false);
@@ -197,6 +203,42 @@ export function LobbyPhase() {
                     <Clock className="w-3 h-3" />
                     في الانتظار
                   </Badge>
+                )}
+                {isHost && player.id !== currentPlayer.id && (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="icon" className="h-8 w-8">
+                        <MoreVertical className="w-4 h-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem
+                        onClick={() => {
+                          transferHost(player.id);
+                          toast({
+                            title: "تم نقل القيادة",
+                            description: `تم نقل القيادة إلى ${player.name}`,
+                          });
+                        }}
+                      >
+                        <UserCog className="w-4 h-4 ml-2" />
+                        نقل القيادة
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        className="text-destructive"
+                        onClick={() => {
+                          kickPlayer(player.id);
+                          toast({
+                            title: "تم طرد اللاعب",
+                            description: `تم طرد ${player.name} من الغرفة`,
+                          });
+                        }}
+                      >
+                        <UserX className="w-4 h-4 ml-2" />
+                        طرد من الغرفة
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 )}
               </div>
             </div>
