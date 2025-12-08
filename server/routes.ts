@@ -151,6 +151,19 @@ const answerIntervals = new Map<string, NodeJS.Timeout>();
 const votingTimers = new Map<string, NodeJS.Timeout>();
 const transitionTimers = new Map<string, NodeJS.Timeout>();
 
+function clearTurnTimer(roomId: string): void {
+  const timer = turnTimers.get(roomId);
+  if (timer) {
+    clearTimeout(timer);
+    turnTimers.delete(roomId);
+  }
+  const interval = turnIntervals.get(roomId);
+  if (interval) {
+    clearInterval(interval);
+    turnIntervals.delete(roomId);
+  }
+}
+
 function clearVotingTimer(roomId: string): void {
   const timer = votingTimers.get(roomId);
   if (timer) {
