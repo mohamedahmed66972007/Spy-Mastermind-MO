@@ -1,4 +1,5 @@
 
+
 import { useEffect, useState } from "react";
 import { Clock, Vote } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
@@ -11,25 +12,13 @@ export function PreVotingTransition() {
   const { room, timerRemaining } = useGame();
   const [displayTimer, setDisplayTimer] = useState(TRANSITION_DURATION);
 
-  // Sync with server timer when it updates
+  // Update display timer whenever server timer changes
   useEffect(() => {
-    if (timerRemaining >= 0 && timerRemaining <= TRANSITION_DURATION) {
+    if (room?.phase === "pre_voting_transition") {
       console.log(`PreVotingTransition: Server timer update: ${timerRemaining}s`);
       setDisplayTimer(timerRemaining);
     }
-  }, [timerRemaining]);
-
-  // Initialize timer when phase starts
-  useEffect(() => {
-    if (room?.phase === "pre_voting_transition") {
-      console.log(`PreVotingTransition: Phase started`);
-      if (timerRemaining > 0 && timerRemaining <= TRANSITION_DURATION) {
-        setDisplayTimer(timerRemaining);
-      } else {
-        setDisplayTimer(TRANSITION_DURATION);
-      }
-    }
-  }, [room?.phase, timerRemaining]);
+  }, [timerRemaining, room?.phase]);
 
   if (!room) return null;
 
@@ -99,3 +88,4 @@ export function PreVotingTransition() {
     </div>
   );
 }
+
