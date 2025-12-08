@@ -1,5 +1,5 @@
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState } from "react";
 import { Clock, Vote } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
@@ -10,7 +10,6 @@ const TRANSITION_DURATION = 10; // 10 seconds
 export function PreVotingTransition() {
   const { room, timerRemaining } = useGame();
   const [displayTimer, setDisplayTimer] = useState(TRANSITION_DURATION);
-  const timerIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   // Sync with server timer when it updates
   useEffect(() => {
@@ -20,37 +19,16 @@ export function PreVotingTransition() {
     }
   }, [timerRemaining]);
 
-  // Initialize and run local countdown when phase starts
+  // Initialize timer when phase starts
   useEffect(() => {
     if (room?.phase === "pre_voting_transition") {
-      console.log(`PreVotingTransition: Phase started, initializing countdown`);
-      
-      // Clear any existing interval
-      if (timerIntervalRef.current) {
-        clearInterval(timerIntervalRef.current);
-      }
-
-      // Initialize display timer
+      console.log(`PreVotingTransition: Phase started`);
       if (timerRemaining > 0 && timerRemaining <= TRANSITION_DURATION) {
         setDisplayTimer(timerRemaining);
       } else {
         setDisplayTimer(TRANSITION_DURATION);
       }
-
-      // Start local countdown as backup
-      timerIntervalRef.current = setInterval(() => {
-        setDisplayTimer((prev) => {
-          if (prev <= 0) return 0;
-          return prev - 1;
-        });
-      }, 1000);
     }
-
-    return () => {
-      if (timerIntervalRef.current) {
-        clearInterval(timerIntervalRef.current);
-      }
-    };
   }, [room?.phase, timerRemaining]);
 
   if (!room) return null;

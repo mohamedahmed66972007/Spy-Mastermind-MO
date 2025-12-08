@@ -184,7 +184,10 @@ function startPreVotingTransition(roomId: string): void {
   clearTransitionTimer(roomId);
 
   const room = getRoom(roomId);
-  if (!room || room.phase !== "pre_voting_transition") return;
+  if (!room || room.phase !== "pre_voting_transition") {
+    console.log(`startPreVotingTransition: Cannot start - room not found or wrong phase`);
+    return;
+  }
 
   const TRANSITION_DURATION = 10000; // 10 seconds
   room.phaseStartTime = Date.now();
@@ -197,7 +200,9 @@ function startPreVotingTransition(roomId: string): void {
   const broadcastTimer = () => {
     const currentRoom = getRoom(roomId);
     if (!currentRoom || currentRoom.phase !== "pre_voting_transition") {
-      if (countdownInterval) clearInterval(countdownInterval);
+      if (countdownInterval) {
+        clearInterval(countdownInterval);
+      }
       return false;
     }
 
@@ -211,19 +216,13 @@ function startPreVotingTransition(roomId: string): void {
       data: { timeRemaining: remaining },
     });
 
-    if (remaining === 0) {
-      if (countdownInterval) clearInterval(countdownInterval);
-      return false;
-    }
-
-    return true;
+    return remaining > 0;
   };
 
   // Initial broadcast - multiple times to ensure delivery
   broadcastTimer();
-  setTimeout(() => broadcastTimer(), 50);
   setTimeout(() => broadcastTimer(), 100);
-  setTimeout(() => broadcastTimer(), 200);
+  setTimeout(() => broadcastTimer(), 500);
 
   // Countdown interval - broadcast every second
   countdownInterval = setInterval(() => {
@@ -236,24 +235,39 @@ function startPreVotingTransition(roomId: string): void {
   // Timer to move to spy voting
   const timer = setTimeout(() => {
     console.log(`startPreVotingTransition: Timer expired, moving to spy_voting`);
-    if (countdownInterval) clearInterval(countdownInterval);
+    
+    if (countdownInterval) {
+      clearInterval(countdownInterval);
+    }
     
     const currentRoom = getRoom(roomId);
-    if (currentRoom && currentRoom.phase === "pre_voting_transition") {
-      currentRoom.phase = "spy_voting";
-      currentRoom.phaseStartTime = Date.now();
-      
-      console.log(`startPreVotingTransition: Phase changed to spy_voting`);
-      
-      broadcastToRoom(roomId, {
-        type: "phase_changed",
-        data: { phase: "spy_voting", room: currentRoom },
-      });
-      
-      startSpyVotingTimer(roomId);
-    } else {
-      console.log(`startPreVotingTransition: Room phase already changed to ${currentRoom?.phase}`);
+    if (!currentRoom) {
+      console.log(`startPreVotingTransition: Room not found`);
+      transitionTimers.delete(roomId);
+      return;
     }
+
+    if (currentRoom.phase !== "pre_voting_transition") {
+      console.log(`startPreVotingTransition: Room phase already changed to ${currentRoom.phase}`);
+      transitionTimers.delete(roomId);
+      return;
+    }
+
+    // Change phase to spy_voting
+    currentRoom.phase = "spy_voting";
+    currentRoom.phaseStartTime = Date.now();
+    
+    console.log(`startPreVotingTransition: Successfully changed phase to spy_voting`);
+    
+    // Broadcast phase change
+    broadcastToRoom(roomId, {
+      type: "phase_changed",
+      data: { phase: "spy_voting", room: currentRoom },
+    });
+    
+    // Start spy voting timer
+    startSpyVotingTimer(roomId);
+    
     transitionTimers.delete(roomId);
   }, TRANSITION_DURATION);
 
