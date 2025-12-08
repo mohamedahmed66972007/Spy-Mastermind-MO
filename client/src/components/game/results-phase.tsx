@@ -1,16 +1,78 @@
-import { useEffect, useRef } from "react";
-import { Trophy, Medal, Star, RotateCcw, Crown, Search } from "lucide-react";
+import { useEffect, useRef, useState, useCallback } from "react";
+import { Trophy, Medal, Star, RotateCcw, Crown, Search, Settings, Minus, Plus, Bot, UsersRound } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
+import { Slider } from "@/components/ui/slider";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { useGame } from "@/lib/game-context";
 import { playResultSound } from "@/lib/sounds";
+import { defaultGameSettings, getSpyCountForPlayers } from "@shared/schema";
 
 export function ResultsPhase() {
-  const { room, currentPlayer, isHost, nextRound, playerId } = useGame();
+  const { room, currentPlayer, isHost, nextRound, playerId, updateSpyCount, updateGuessValidationMode, updateGameSettings: updateServerSettings } = useGame();
   const soundPlayed = useRef(false);
+  const [showSettings, setShowSettings] = useState(false);
+  const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const dialogOpenRef = useRef(false);
+  
+  // Track dialog open state in ref for debounce guard
+  useEffect(() => {
+    dialogOpenRef.current = showSettings;
+  }, [showSettings]);
+
+  const [localSettings, setLocalSettings] = useState({
+    questionsPerPlayer: room?.gameSettings?.questionsPerPlayer || defaultGameSettings.questionsPerPlayer,
+    questionDuration: room?.gameSettings?.questionDuration || defaultGameSettings.questionDuration,
+    answerDuration: room?.gameSettings?.answerDuration || defaultGameSettings.answerDuration,
+    spyVotingDuration: room?.gameSettings?.spyVotingDuration || defaultGameSettings.spyVotingDuration,
+    spyGuessDuration: room?.gameSettings?.spyGuessDuration || defaultGameSettings.spyGuessDuration,
+  });
+
+  useEffect(() => {
+    if (room?.gameSettings) {
+      setLocalSettings({
+        questionsPerPlayer: room.gameSettings.questionsPerPlayer,
+        questionDuration: room.gameSettings.questionDuration,
+        answerDuration: room.gameSettings.answerDuration,
+        spyVotingDuration: room.gameSettings.spyVotingDuration,
+        spyGuessDuration: room.gameSettings.spyGuessDuration,
+      });
+    }
+  }, [room?.gameSettings]);
+
+  // Cleanup debounce timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (debounceTimeoutRef.current) {
+        clearTimeout(debounceTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  const updateGameSettings = useCallback((settings: Partial<typeof localSettings>) => {
+    setLocalSettings(prev => ({ ...prev, ...settings }));
+    
+    // Clear any pending debounce
+    if (debounceTimeoutRef.current) {
+      clearTimeout(debounceTimeoutRef.current);
+    }
+    
+    // Schedule new update with guard check
+    debounceTimeoutRef.current = setTimeout(() => {
+      // Only send update if dialog is still open
+      if (dialogOpenRef.current) {
+        updateServerSettings(settings);
+      }
+    }, 300);
+  }, [updateServerSettings]);
 
   const spyWon = room?.spyGuessCorrect !== undefined 
     ? room.spyGuessCorrect 
@@ -30,6 +92,13 @@ export function ResultsPhase() {
   }, [room, isSpy, spyWon]);
 
   if (!room || !currentPlayer) return null;
+
+  const defaultSpyCount = getSpyCountForPlayers(room.players.length);
+
+  const handleSpyCountChange = (delta: number) => {
+    const newCount = Math.max(1, Math.min(room.spyCount + delta, Math.floor(room.players.length / 2)));
+    updateSpyCount(newCount);
+  };
 
   const sortedPlayers = [...room.players].sort((a, b) => b.score - a.score);
 
@@ -174,15 +243,29 @@ export function ResultsPhase() {
       </Card>
 
       {isHost && (
-        <Button
-          size="lg"
-          className="w-full min-h-14 text-lg gap-2"
-          onClick={nextRound}
-          data-testid="button-next-round"
-        >
-          <RotateCcw className="w-5 h-5" />
-          الجولة التالية
-        </Button>
+        <div className="flex flex-col gap-3">
+          <div className="flex gap-3">
+            <Button
+              size="lg"
+              className="flex-1 min-h-14 text-lg gap-2"
+              onClick={nextRound}
+              data-testid="button-next-round"
+            >
+              <RotateCcw className="w-5 h-5" />
+              الجولة التالية
+            </Button>
+            <Button
+              size="lg"
+              variant="outline"
+              className="min-h-14 gap-2"
+              onClick={() => setShowSettings(true)}
+              data-testid="button-room-settings"
+            >
+              <Settings className="w-5 h-5" />
+              الإعدادات
+            </Button>
+          </div>
+        </div>
       )}
 
       {!isHost && (
@@ -190,6 +273,192 @@ export function ResultsPhase() {
           في انتظار القائد لبدء الجولة التالية...
         </p>
       )}
+
+      <Dialog open={showSettings} onOpenChange={(open) => {
+        // Clear pending debounce when closing dialog
+        if (!open && debounceTimeoutRef.current) {
+          clearTimeout(debounceTimeoutRef.current);
+          debounceTimeoutRef.current = null;
+        }
+        setShowSettings(open);
+      }}>
+        <DialogContent className="max-w-md max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Settings className="w-5 h-5 text-primary" />
+              إعدادات الجولة القادمة
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <p className="font-medium">عدد الجواسيس</p>
+                <p className="text-sm text-muted-foreground">
+                  الافتراضي: {defaultSpyCount} جاسوس
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  size="icon"
+                  variant="outline"
+                  onClick={() => handleSpyCountChange(-1)}
+                  disabled={room.spyCount <= 1}
+                  data-testid="button-decrease-spy-results"
+                >
+                  <Minus className="w-4 h-4" />
+                </Button>
+                <span className="w-8 text-center font-bold text-lg">
+                  {room.spyCount}
+                </span>
+                <Button
+                  size="icon"
+                  variant="outline"
+                  onClick={() => handleSpyCountChange(1)}
+                  disabled={room.spyCount >= Math.floor(room.players.length / 2)}
+                  data-testid="button-increase-spy-results"
+                >
+                  <Plus className="w-4 h-4" />
+                </Button>
+              </div>
+            </div>
+
+            <Separator />
+
+            <div className="space-y-3">
+              <p className="font-medium">عدد الأسئلة لكل لاعب</p>
+              <div className="flex items-center gap-4">
+                <Slider
+                  value={[localSettings.questionsPerPlayer]}
+                  onValueChange={(value) => updateGameSettings({ questionsPerPlayer: value[0] })}
+                  min={1}
+                  max={10}
+                  step={1}
+                  className="flex-1"
+                  data-testid="slider-questions-per-player-results"
+                />
+                <span className="w-12 text-center font-bold text-lg">
+                  {localSettings.questionsPerPlayer}
+                </span>
+              </div>
+            </div>
+
+            <Separator />
+
+            <div className="space-y-3">
+              <p className="font-medium">مدة السؤال (ثانية)</p>
+              <div className="flex items-center gap-4">
+                <Slider
+                  value={[localSettings.questionDuration]}
+                  onValueChange={(value) => updateGameSettings({ questionDuration: value[0] })}
+                  min={30}
+                  max={300}
+                  step={15}
+                  className="flex-1"
+                  data-testid="slider-question-duration-results"
+                />
+                <span className="w-12 text-center font-bold text-lg">
+                  {localSettings.questionDuration}
+                </span>
+              </div>
+            </div>
+
+            <Separator />
+
+            <div className="space-y-3">
+              <p className="font-medium">مدة الإجابة (ثانية)</p>
+              <div className="flex items-center gap-4">
+                <Slider
+                  value={[localSettings.answerDuration]}
+                  onValueChange={(value) => updateGameSettings({ answerDuration: value[0] })}
+                  min={15}
+                  max={120}
+                  step={5}
+                  className="flex-1"
+                  data-testid="slider-answer-duration-results"
+                />
+                <span className="w-12 text-center font-bold text-lg">
+                  {localSettings.answerDuration}
+                </span>
+              </div>
+            </div>
+
+            <Separator />
+
+            <div className="space-y-3">
+              <p className="font-medium">مدة التصويت على الجاسوس (ثانية)</p>
+              <div className="flex items-center gap-4">
+                <Slider
+                  value={[localSettings.spyVotingDuration]}
+                  onValueChange={(value) => updateGameSettings({ spyVotingDuration: value[0] })}
+                  min={15}
+                  max={120}
+                  step={5}
+                  className="flex-1"
+                  data-testid="slider-spy-voting-duration-results"
+                />
+                <span className="w-12 text-center font-bold text-lg">
+                  {localSettings.spyVotingDuration}
+                </span>
+              </div>
+            </div>
+
+            <Separator />
+
+            <div className="space-y-3">
+              <p className="font-medium">مدة تخمين الجاسوس (ثانية)</p>
+              <div className="flex items-center gap-4">
+                <Slider
+                  value={[localSettings.spyGuessDuration]}
+                  onValueChange={(value) => updateGameSettings({ spyGuessDuration: value[0] })}
+                  min={15}
+                  max={120}
+                  step={5}
+                  className="flex-1"
+                  data-testid="slider-spy-guess-duration-results"
+                />
+                <span className="w-12 text-center font-bold text-lg">
+                  {localSettings.spyGuessDuration}
+                </span>
+              </div>
+            </div>
+
+            <Separator />
+
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <p className="font-medium">التحقق من تخمين الجاسوس</p>
+                <p className="text-sm text-muted-foreground">
+                  {room.guessValidationMode === "system" 
+                    ? "تلقائي: النظام يتحقق من صحة التخمين" 
+                    : "يدوي: اللاعبون يصوتون على صحة التخمين"}
+                </p>
+              </div>
+              <div className="flex items-center gap-1">
+                <Button
+                  size="sm"
+                  variant={room.guessValidationMode === "system" ? "default" : "outline"}
+                  onClick={() => updateGuessValidationMode("system")}
+                  className="gap-1"
+                  data-testid="button-validation-system-results"
+                >
+                  <Bot className="w-4 h-4" />
+                  تلقائي
+                </Button>
+                <Button
+                  size="sm"
+                  variant={room.guessValidationMode === "players" ? "default" : "outline"}
+                  onClick={() => updateGuessValidationMode("players")}
+                  className="gap-1"
+                  data-testid="button-validation-players-results"
+                >
+                  <UsersRound className="w-4 h-4" />
+                  يدوي
+                </Button>
+              </div>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

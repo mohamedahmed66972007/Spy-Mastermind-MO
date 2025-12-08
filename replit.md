@@ -6,6 +6,26 @@ The application supports two game modes: Classic (spies know their word differs)
 
 ## Recent Changes (December 2025)
 
+**Copy Room Link & Join Improvements:**
+- Separate state variables for room code and external player copy buttons to prevent state conflicts
+- Join page trims and normalizes room codes before submission to handle whitespace
+
+**Fuzzy Matching for Arabic Spelling:**
+- Stricter thresholds: words 5 chars or less require exact match
+- Max 1 character length difference allowed between guess and target
+- 6-9 character words: max 1 typo allowed
+- 10+ character words: max 2 typos allowed
+
+**WebSocket Reconnection:**
+- Automatic reconnection with exponential backoff (max 5 attempts)
+- Properly stops retrying on authentication errors (4401 codes)
+- Cleans up existing socket before creating new connection
+
+**Results Phase Settings:**
+- Room settings dialog on results page allows host to modify parameters between rounds
+- Settings updates now supported in both "lobby" and "results" phases
+- Debounced updates with guard flag to prevent stale updates after dialog closes
+
 **Timer System Updates:**
 - Two-phase questioning timer: 60 seconds for asking questions, 30 seconds for answering
 - Display text changes dynamically: "دور X يسأل" (X's turn to ask) → "دور X يجاوب على Y" (X answering Y)

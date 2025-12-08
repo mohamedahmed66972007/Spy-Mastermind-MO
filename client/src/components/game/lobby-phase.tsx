@@ -13,7 +13,8 @@ import { getMinPlayersForStart, getMaxPlayers, getSpyCountForPlayers, defaultGam
 export function LobbyPhase() {
   const { room, currentPlayer, isHost, toggleReady, startGame, updateSpyCount, updateGuessValidationMode, updateWordSource, updateGameSettings: updateServerSettings } = useGame();
   const { toast } = useToast();
-  const [copied, setCopied] = useState(false);
+  const [copiedRoom, setCopiedRoom] = useState(false);
+  const [copiedExternal, setCopiedExternal] = useState(false);
 
   // Local state for smooth slider updates
   const [localSettings, setLocalSettings] = useState({
@@ -83,9 +84,22 @@ export function LobbyPhase() {
   const copyExternalLink = () => {
     const link = getExternalPlayerLink();
     navigator.clipboard.writeText(link);
-    setCopied(true);
+    setCopiedExternal(true);
     toast({ title: "تم النسخ!", description: "تم نسخ الرابط بنجاح" });
-    setTimeout(() => setCopied(false), 2000);
+    setTimeout(() => setCopiedExternal(false), 2000);
+  };
+
+  const getRoomJoinLink = () => {
+    const baseUrl = window.location.origin;
+    return `${baseUrl}/join/${room.id}`;
+  };
+
+  const copyRoomLink = () => {
+    const link = getRoomJoinLink();
+    navigator.clipboard.writeText(link);
+    setCopiedRoom(true);
+    toast({ title: "تم النسخ!", description: "تم نسخ رابط الغرفة بنجاح. شاركه مع أصدقائك للانضمام!" });
+    setTimeout(() => setCopiedRoom(false), 2000);
   };
 
   return (
@@ -98,6 +112,27 @@ export function LobbyPhase() {
           في انتظار انضمام اللاعبين وتأكيد استعدادهم
         </p>
       </div>
+
+      <Card>
+        <CardContent className="py-3">
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-muted-foreground">رمز الغرفة:</span>
+              <span className="font-mono font-bold text-lg tracking-wider">{room.id}</span>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-2"
+              onClick={copyRoomLink}
+              data-testid="button-copy-room-link"
+            >
+              {copiedRoom ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+              {copiedRoom ? "تم النسخ" : "نسخ رابط الدعوة"}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader className="pb-3">

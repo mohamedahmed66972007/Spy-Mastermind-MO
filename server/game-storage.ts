@@ -38,11 +38,93 @@ function normalizeArabicWord(word: string): string {
   return normalized.trim().toLowerCase();
 }
 
+// Levenshtein distance algorithm for fuzzy matching
+function levenshteinDistance(str1: string, str2: string): number {
+  const m = str1.length;
+  const n = str2.length;
+  
+  // Create a 2D array to store distances
+  const dp: number[][] = Array(m + 1).fill(null).map(() => Array(n + 1).fill(0));
+  
+  // Initialize base cases
+  for (let i = 0; i <= m; i++) dp[i][0] = i;
+  for (let j = 0; j <= n; j++) dp[0][j] = j;
+  
+  // Fill the matrix
+  for (let i = 1; i <= m; i++) {
+    for (let j = 1; j <= n; j++) {
+      if (str1[i - 1] === str2[j - 1]) {
+        dp[i][j] = dp[i - 1][j - 1];
+      } else {
+        dp[i][j] = 1 + Math.min(
+          dp[i - 1][j],     // deletion
+          dp[i][j - 1],     // insertion
+          dp[i - 1][j - 1]  // substitution
+        );
+      }
+    }
+  }
+  
+  return dp[m][n];
+}
+
+// Calculate similarity ratio (0-1) based on Levenshtein distance
+function getSimilarityRatio(str1: string, str2: string): number {
+  if (str1 === str2) return 1;
+  if (str1.length === 0 || str2.length === 0) return 0;
+  
+  const distance = levenshteinDistance(str1, str2);
+  const maxLength = Math.max(str1.length, str2.length);
+  return 1 - (distance / maxLength);
+}
+
+// Check if words are similar enough (handles typos)
+function areSimilarWords(word1: string, word2: string): boolean {
+  // Exact match after normalization
+  if (word1 === word2) return true;
+  
+  // For short words (5 chars or less), require exact match
+  if (word1.length <= 5 || word2.length <= 5) {
+    return word1 === word2;
+  }
+  
+  // Length difference check - words must be very close in length
+  const lengthDiff = Math.abs(word1.length - word2.length);
+  if (lengthDiff > 1) {
+    return false; // Too different in length (allow max 1 char difference)
+  }
+  
+  // Calculate Levenshtein distance
+  const distance = levenshteinDistance(word1, word2);
+  const avgLength = (word1.length + word2.length) / 2;
+  
+  // Stricter: Maximum 1 typo for 6-9 chars, 2 for 10+ chars
+  let maxAllowedErrors: number;
+  if (avgLength <= 9) {
+    maxAllowedErrors = 1;
+  } else {
+    maxAllowedErrors = 2;
+  }
+  
+  return distance <= maxAllowedErrors;
+}
+
 function isGuessCorrect(guess: string, actualWord: string): boolean {
   const normalizedGuess = normalizeArabicWord(guess);
   const normalizedActual = normalizeArabicWord(actualWord);
-  console.log(`[Guess Validation] Guess: "${guess}" -> "${normalizedGuess}", Actual: "${actualWord}" -> "${normalizedActual}", Match: ${normalizedGuess === normalizedActual}`);
-  return normalizedGuess === normalizedActual;
+  
+  // First check exact match
+  const exactMatch = normalizedGuess === normalizedActual;
+  
+  // If not exact match, check fuzzy match
+  const fuzzyMatch = !exactMatch && areSimilarWords(normalizedGuess, normalizedActual);
+  
+  const isCorrect = exactMatch || fuzzyMatch;
+  
+  const similarity = getSimilarityRatio(normalizedGuess, normalizedActual);
+  console.log(`[Guess Validation] Guess: "${guess}" -> "${normalizedGuess}", Actual: "${actualWord}" -> "${normalizedActual}", Exact: ${exactMatch}, Fuzzy: ${fuzzyMatch}, Similarity: ${(similarity * 100).toFixed(1)}%, Result: ${isCorrect}`);
+  
+  return isCorrect;
 }
 
 function processSystemGuessValidation(room: Room, guessIsCorrect: boolean): void {
@@ -235,7 +317,8 @@ export function updateGuessValidationMode(playerId: string, mode: GuessValidatio
 
   const player = room.players.find((p) => p.id === playerId);
   if (!player?.isHost) return undefined;
-  if (room.phase !== "lobby") return undefined;
+  // Allow updates during lobby or results phase (for next round)
+  if (room.phase !== "lobby" && room.phase !== "results") return undefined;
 
   room.guessValidationMode = mode;
   return room;
@@ -247,7 +330,8 @@ export function updateGameSettings(playerId: string, settings: Partial<GameSetti
 
   const player = room.players.find((p) => p.id === playerId);
   if (!player?.isHost) return undefined;
-  if (room.phase !== "lobby") return undefined;
+  // Allow updates during lobby or results phase (for next round)
+  if (room.phase !== "lobby" && room.phase !== "results") return undefined;
 
   // Validate and apply settings
   if (settings.questionsPerPlayer !== undefined) {

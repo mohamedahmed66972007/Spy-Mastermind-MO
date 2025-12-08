@@ -67,36 +67,75 @@ export function GameProvider({ children }: { children: ReactNode }) {
   const [isConnected, setIsConnected] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [timerRemaining, setTimerRemaining] = useState(0);
-  const reconnectAttempted = useRef(false);
+  const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const socketRef = useRef<WebSocket | null>(null);
+  const reconnectAttemptsRef = useRef(0);
+  const maxReconnectAttempts = 5;
+  const baseReconnectDelay = 1000;
 
-  useEffect(() => {
+  const connectWebSocket = useCallback(() => {
+    // Clean up any existing socket and timeout
+    if (reconnectTimeoutRef.current) {
+      clearTimeout(reconnectTimeoutRef.current);
+      reconnectTimeoutRef.current = null;
+    }
+    if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
+      socketRef.current.close();
+    }
+    
     const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
     const wsUrl = `${protocol}//${window.location.host}/ws`;
+    
+    console.log(`[WebSocket] Connecting to ${wsUrl}...`);
     const ws = new WebSocket(wsUrl);
+    socketRef.current = ws;
 
     ws.onopen = () => {
+      console.log("[WebSocket] Connected successfully");
       setIsConnected(true);
       setError(null);
+      reconnectAttemptsRef.current = 0;
 
       // Try to reconnect with saved session
-      if (!reconnectAttempted.current) {
-        reconnectAttempted.current = true;
-        const session = getSession();
-        if (session) {
-          ws.send(JSON.stringify({
-            type: "reconnect",
-            data: { sessionToken: session.sessionToken, roomCode: session.roomCode }
-          }));
-        }
+      const session = getSession();
+      if (session) {
+        console.log("[WebSocket] Attempting to restore session...");
+        ws.send(JSON.stringify({
+          type: "reconnect",
+          data: { sessionToken: session.sessionToken, roomCode: session.roomCode }
+        }));
       }
     };
 
-    ws.onclose = () => {
+    ws.onclose = (event) => {
+      console.log(`[WebSocket] Connection closed (code: ${event.code}, reason: ${event.reason})`);
       setIsConnected(false);
+      
+      // Only reconnect if this is still the current socket
+      if (socketRef.current !== ws) {
+        return;
+      }
+      
+      // Don't reconnect for certain close codes (normal closure, going away)
+      if (event.code === 1000 || event.code === 1001) {
+        return;
+      }
+      
+      // Attempt reconnection with exponential backoff
+      if (reconnectAttemptsRef.current < maxReconnectAttempts) {
+        const delay = Math.min(baseReconnectDelay * Math.pow(2, reconnectAttemptsRef.current), 30000);
+        console.log(`[WebSocket] Reconnecting in ${delay}ms (attempt ${reconnectAttemptsRef.current + 1}/${maxReconnectAttempts})...`);
+        reconnectTimeoutRef.current = setTimeout(() => {
+          reconnectAttemptsRef.current++;
+          connectWebSocket();
+        }, delay);
+      } else {
+        setError("فقد الاتصال بالخادم. يرجى تحديث الصفحة.");
+      }
     };
 
-    ws.onerror = () => {
-      setError("حدث خطأ في الاتصال");
+    ws.onerror = (event) => {
+      console.error("[WebSocket] Error:", event);
     };
 
     ws.onmessage = (event) => {
@@ -104,16 +143,29 @@ export function GameProvider({ children }: { children: ReactNode }) {
         const message: ServerMessage = JSON.parse(event.data);
         handleServerMessage(message);
       } catch {
-        console.error("Failed to parse message");
+        console.error("[WebSocket] Failed to parse message");
       }
     };
 
     setSocket(ws);
+    
+    return ws;
+  }, []);
+
+  useEffect(() => {
+    const ws = connectWebSocket();
 
     return () => {
-      ws.close();
+      // Clear any pending reconnection
+      if (reconnectTimeoutRef.current) {
+        clearTimeout(reconnectTimeoutRef.current);
+        reconnectTimeoutRef.current = null;
+      }
+      // Mark as intentional close to prevent reconnection
+      socketRef.current = null;
+      ws.close(1000, "Component unmounting");
     };
-  }, []);
+  }, [connectWebSocket]);
 
   const handleServerMessage = useCallback((message: ServerMessage) => {
     switch (message.type) {
