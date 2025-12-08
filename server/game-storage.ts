@@ -787,24 +787,22 @@ export function markDoneWithQuestions(playerId: string): Room | undefined {
 }
 
 function advanceToNextTurn(room: Room): void {
-  // Find the current player's position in the queue
-  const currentIndex = room.turnQueue.indexOf(room.currentTurnPlayerId || "");
+  if (!room.currentTurnPlayerId) return;
 
-  // Look for next eligible player (starting from next position)
-  let attempts = 0;
+  const currentIndex = room.turnQueue.indexOf(room.currentTurnPlayerId);
+
+  // Find next player in queue who hasn't marked themselves done
   let nextIndex = (currentIndex + 1) % room.turnQueue.length;
+  let attempts = 0;
 
   while (attempts < room.turnQueue.length) {
     const nextPlayerId = room.turnQueue[nextIndex];
     const nextPlayer = room.players.find(p => p.id === nextPlayerId);
 
-    // Check if player is eligible (has questions and not done)
-    if (nextPlayer &&
-        !nextPlayer.doneWithQuestions &&
-        (nextPlayer.questionsRemaining === undefined || nextPlayer.questionsRemaining > 0)) {
+    // If player is not done and has questions remaining, they get the turn
+    if (nextPlayer && !nextPlayer.doneWithQuestions && (nextPlayer.questionsRemaining ?? 0) > 0) {
       room.currentTurnPlayerId = nextPlayerId;
-      room.currentPlayerIndex = room.players.findIndex(p => p.id === nextPlayerId);
-      room.turnTimerEnd = Date.now() + 60000; // 1 minute timer for next turn
+      room.turnTimerEnd = undefined; // Reset timer for new turn
       return;
     }
 
@@ -812,12 +810,11 @@ function advanceToNextTurn(room: Room): void {
     attempts++;
   }
 
-  // No more eligible players, move to spy voting
-  room.phase = "spy_voting";
-  room.phaseStartTime = Date.now(); // Start timer for spy voting phase
-  room.spyVotes = [];
+  // If we've looped through all players and no one can ask questions, move to transition phase
+  room.phase = "pre_voting_transition";
   room.currentTurnPlayerId = undefined;
   room.turnTimerEnd = undefined;
+  room.phaseStartTime = Date.now(); // Set timer for 10 second transition
 }
 
 export function checkAllPlayersDoneWithQuestions(room: Room): boolean {

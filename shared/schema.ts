@@ -22,11 +22,12 @@ export const defaultGameSettings: GameSettings = {
   spyGuessDuration: 30,
 };
 
-export type GamePhase = 
+export type GamePhase =
   | "lobby"
   | "category_voting"
   | "word_reveal"
   | "questioning"
+  | "pre_voting_transition"
   | "spy_voting"
   | "spy_guess"
   | "guess_validation"
