@@ -40,11 +40,15 @@ export function QuestioningPhase() {
     }
   }, [timerRemaining]);
 
+  // Get timer durations from room settings
+  const questionDuration = room?.gameSettings?.questionDuration || 60;
+  const answerDuration = room?.gameSettings?.answerDuration || 30;
+  
   // Reset local timer and play sound when turn changes
   useEffect(() => {
     if (currentTurnId && currentTurnId !== prevTurnPlayerId.current) {
-      // Turn changed - reset timer to 60 seconds
-      setLocalTimer(60);
+      // Turn changed - reset timer to question duration from settings
+      setLocalTimer(questionDuration);
       playedWarning.current = false;
       
       if (currentTurnId === playerId) {
@@ -52,7 +56,7 @@ export function QuestioningPhase() {
       }
       prevTurnPlayerId.current = currentTurnId;
     }
-  }, [currentTurnId, playerId]);
+  }, [currentTurnId, playerId, questionDuration]);
 
   // Single interval for countdown - only recreated on phase/turn changes, not every tick
   useEffect(() => {
@@ -130,8 +134,8 @@ export function QuestioningPhase() {
   const targetPlayerForAnswer = isWaitingForAnswer ? room.players.find(p => p.id === lastQ.targetId) : null;
   const askerPlayer = isWaitingForAnswer ? room.players.find(p => p.id === lastQ.askerId) : null;
   
-  // Timer max based on phase (60s for asking, 30s for answering)
-  const timerMax = isWaitingForAnswer ? 30 : 60;
+  // Timer max based on phase (using settings for asking, answering)
+  const timerMax = isWaitingForAnswer ? answerDuration : questionDuration;
 
   return (
     <div className="space-y-6">

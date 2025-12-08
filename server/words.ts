@@ -278,6 +278,43 @@ export function getRandomWord(category: string): string {
   return words[Math.floor(Math.random() * words.length)];
 }
 
+// Country regions for better pairing in blind mode
+const countryRegions: Record<string, string[]> = {
+  "الخليج العربي": ["السعودية", "الإمارات", "الكويت", "قطر", "البحرين", "عمان"],
+  "الشام": ["الأردن", "لبنان", "سوريا", "فلسطين", "العراق"],
+  "شمال أفريقيا": ["مصر", "ليبيا", "تونس", "الجزائر", "المغرب", "السودان", "موريتانيا"],
+  "القرن الأفريقي": ["الصومال", "جيبوتي", "إريتريا", "إثيوبيا"],
+  "جنوب آسيا": ["الهند", "باكستان", "بنغلاديش", "سريلانكا", "نيبال", "بوتان", "المالديف", "أفغانستان"],
+  "شرق آسيا": ["الصين", "اليابان", "كوريا الجنوبية", "كوريا الشمالية", "تايوان", "هونج كونج", "منغوليا"],
+  "جنوب شرق آسيا": ["تايلاند", "ماليزيا", "إندونيسيا", "فيتنام", "الفلبين", "سنغافورة", "ميانمار", "كمبوديا", "لاوس", "بروناي", "تيمور الشرقية"],
+  "آسيا الوسطى": ["كازاخستان", "أوزبكستان", "قيرغيزستان", "طاجيكستان", "تركمانستان"],
+  "القوقاز": ["أذربيجان", "جورجيا", "أرمينيا"],
+  "الشرق الأوسط": ["تركيا", "إيران"],
+  "غرب أوروبا": ["فرنسا", "ألمانيا", "هولندا", "بلجيكا", "لوكسمبورغ", "سويسرا", "النمسا"],
+  "جنوب أوروبا": ["إيطاليا", "إسبانيا", "البرتغال", "اليونان", "قبرص", "مالطا"],
+  "شمال أوروبا": ["بريطانيا", "أيرلندا", "السويد", "النرويج", "الدنمارك", "فنلندا", "أيسلندا"],
+  "شرق أوروبا": ["روسيا", "أوكرانيا", "بولندا", "رومانيا", "التشيك", "المجر", "بيلاروسيا", "بلغاريا", "صربيا", "كرواتيا", "سلوفاكيا", "سلوفينيا"],
+  "البلطيق": ["ليتوانيا", "لاتفيا", "إستونيا"],
+  "البلقان": ["البوسنة والهرسك", "ألبانيا", "مقدونيا الشمالية", "الجبل الأسود", "كوسوفو"],
+  "أمريكا الشمالية": ["أمريكا", "كندا", "المكسيك"],
+  "أمريكا الجنوبية": ["البرازيل", "الأرجنتين", "كولومبيا", "تشيلي", "بيرو", "فنزويلا", "الإكوادور", "بوليفيا", "باراغواي", "أوروغواي"],
+  "أمريكا الوسطى والكاريبي": ["كوبا", "جامايكا", "هايتي", "جمهورية الدومينيكان", "بورتوريكو", "بنما", "كوستاريكا", "غواتيمالا", "هندوراس", "السلفادور", "نيكاراغوا", "بليز"],
+  "أوقيانوسيا": ["أستراليا", "نيوزيلندا", "فيجي", "بابوا غينيا الجديدة", "ساموا", "تونغا"],
+  "غرب أفريقيا": ["نيجيريا", "غانا", "ساحل العاج", "السنغال", "مالي", "بوركينا فاسو", "النيجر", "غينيا", "بنين", "توغو", "سيراليون", "ليبيريا", "غامبيا", "غينيا بيساو"],
+  "شرق أفريقيا": ["كينيا", "تنزانيا", "أوغندا", "رواندا", "بوروندي"],
+  "جنوب أفريقيا": ["جنوب أفريقيا", "موزمبيق", "مدغشقر", "زيمبابوي", "ناميبيا", "بتسوانا", "ليسوتو", "موريشيوس"],
+  "وسط أفريقيا": ["الكونغو", "الكاميرون", "تشاد", "غينيا الاستوائية", "الجابون"],
+};
+
+function getCountryRegion(country: string): string | undefined {
+  for (const [region, countries] of Object.entries(countryRegions)) {
+    if (countries.includes(country)) {
+      return region;
+    }
+  }
+  return undefined;
+}
+
 export function getDifferentWord(category: string, excludeWord: string): string {
   const words = wordsByCategory[category] || wordsByCategory.countries;
   const filteredWords = words.filter((w) => w !== excludeWord);
@@ -285,40 +322,125 @@ export function getDifferentWord(category: string, excludeWord: string): string 
 }
 
 export function getSimilarWord(category: string, excludeWord: string): string {
+  // For fruits_vegetables: MUST match same type (fruit with fruit, vegetable with vegetable)
   if (category === "fruits_vegetables") {
     const wordData = fruitsVegetablesWithMetadata.find(w => w.name === excludeWord);
     if (wordData) {
-      const similarWords = fruitsVegetablesWithMetadata.filter(w => {
-        if (w.name === excludeWord) return false;
-        let score = 0;
-        if (w.type === wordData.type) score += 3;
-        if (w.color === wordData.color) score += 2;
-        if (w.size === wordData.size) score += 1;
-        return score >= 2;
-      });
+      // First, get all words of the same type (fruit/vegetable)
+      const sameTypeWords = fruitsVegetablesWithMetadata.filter(w => 
+        w.name !== excludeWord && w.type === wordData.type
+      );
       
-      if (similarWords.length > 0) {
-        return similarWords[Math.floor(Math.random() * similarWords.length)].name;
+      if (sameTypeWords.length > 0) {
+        // Score them by similarity (color, size)
+        const scoredWords = sameTypeWords.map(w => {
+          let score = 0;
+          if (w.color === wordData.color) score += 2;
+          if (w.size === wordData.size) score += 1;
+          return { word: w, score };
+        });
+        
+        // Sort by score (highest first) and take from top candidates
+        scoredWords.sort((a, b) => b.score - a.score);
+        const maxScore = scoredWords[0].score;
+        const topCandidates = scoredWords.filter(s => s.score >= maxScore - 1);
+        
+        return topCandidates[Math.floor(Math.random() * topCandidates.length)].word.name;
       }
     }
+    // Fallback: return any different fruit/vegetable (shouldn't happen with good data)
+    return getDifferentWord(category, excludeWord);
   }
   
+  // For animals: prefer same category and similar habitat
   if (category === "animals") {
     const wordData = animalsWithMetadata.find(w => w.name === excludeWord);
     if (wordData) {
-      const similarWords = animalsWithMetadata.filter(w => {
-        if (w.name === excludeWord) return false;
-        let score = 0;
-        if (w.category === wordData.category) score += 3;
-        if (w.habitat === wordData.habitat) score += 2;
-        if (w.size === wordData.size) score += 1;
-        return score >= 2;
-      });
+      // First, try to find animals in the same category
+      const sameCategoryWords = animalsWithMetadata.filter(w => 
+        w.name !== excludeWord && w.category === wordData.category
+      );
       
-      if (similarWords.length > 0) {
-        return similarWords[Math.floor(Math.random() * similarWords.length)].name;
+      if (sameCategoryWords.length > 0) {
+        // Score by habitat and size similarity
+        const scoredWords = sameCategoryWords.map(w => {
+          let score = 0;
+          if (w.habitat === wordData.habitat) score += 2;
+          if (w.size === wordData.size) score += 1;
+          return { word: w, score };
+        });
+        
+        scoredWords.sort((a, b) => b.score - a.score);
+        const maxScore = scoredWords[0].score;
+        const topCandidates = scoredWords.filter(s => s.score >= maxScore - 1);
+        
+        return topCandidates[Math.floor(Math.random() * topCandidates.length)].word.name;
+      }
+      
+      // Fallback to same habitat if no same category
+      const sameHabitatWords = animalsWithMetadata.filter(w => 
+        w.name !== excludeWord && w.habitat === wordData.habitat
+      );
+      
+      if (sameHabitatWords.length > 0) {
+        return sameHabitatWords[Math.floor(Math.random() * sameHabitatWords.length)].name;
       }
     }
+    return getDifferentWord(category, excludeWord);
+  }
+  
+  // For countries: MUST be from the same region
+  if (category === "countries") {
+    const region = getCountryRegion(excludeWord);
+    if (region) {
+      const regionCountries = countryRegions[region].filter(c => c !== excludeWord);
+      if (regionCountries.length > 0) {
+        return regionCountries[Math.floor(Math.random() * regionCountries.length)];
+      }
+    }
+    // If country not in any defined region, find a nearby region country
+    // Fallback to any different country (but this shouldn't happen often)
+    return getDifferentWord(category, excludeWord);
+  }
+  
+  // For cars: try to match brand, but avoid pairing brand-only with brand+model
+  if (category === "cars") {
+    const words = wordsByCategory.cars;
+    // Extract brand from the word (first word is usually the brand)
+    const excludeParts = excludeWord.split(' ');
+    const excludeBrand = excludeParts[0];
+    const excludeHasModel = excludeParts.length > 1;
+    
+    // Find other cars from the same brand
+    const sameBrandCars = words.filter(w => {
+      if (w === excludeWord) return false;
+      const parts = w.split(' ');
+      const brand = parts[0];
+      const hasModel = parts.length > 1;
+      
+      // Must be same brand
+      if (brand !== excludeBrand) return false;
+      
+      // Both should have models, or both should be brand-only
+      // This prevents pairing "تويوتا" with "تويوتا كامري"
+      return hasModel === excludeHasModel;
+    });
+    
+    if (sameBrandCars.length > 0) {
+      return sameBrandCars[Math.floor(Math.random() * sameBrandCars.length)];
+    }
+    
+    // Fallback: find any car with same brand (even if model status differs)
+    const anyBrandCars = words.filter(w => 
+      w !== excludeWord && w.startsWith(excludeBrand + ' ')
+    );
+    
+    if (anyBrandCars.length > 0) {
+      return anyBrandCars[Math.floor(Math.random() * anyBrandCars.length)];
+    }
+    
+    // Last fallback: return any different car
+    return getDifferentWord(category, excludeWord);
   }
   
   return getDifferentWord(category, excludeWord);

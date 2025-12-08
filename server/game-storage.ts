@@ -78,32 +78,36 @@ function getSimilarityRatio(str1: string, str2: string): number {
   return 1 - (distance / maxLength);
 }
 
-// Check if words are similar enough (handles typos)
+// Check if words are similar enough (handles typos) - more lenient for Arabic
 function areSimilarWords(word1: string, word2: string): boolean {
   // Exact match after normalization
   if (word1 === word2) return true;
 
-  // For short words (5 chars or less), require exact match
-  if (word1.length <= 5 || word2.length <= 5) {
+  // For very short words (3 chars or less), require exact match
+  if (word1.length <= 3 || word2.length <= 3) {
     return word1 === word2;
   }
 
-  // Length difference check - words must be very close in length
+  // Length difference check - allow more flexibility
   const lengthDiff = Math.abs(word1.length - word2.length);
-  if (lengthDiff > 1) {
-    return false; // Too different in length (allow max 1 char difference)
+  if (lengthDiff > 2) {
+    return false; // Too different in length (allow max 2 char difference)
   }
 
   // Calculate Levenshtein distance
   const distance = levenshteinDistance(word1, word2);
   const avgLength = (word1.length + word2.length) / 2;
 
-  // Stricter: Maximum 1 typo for 6-9 chars, 2 for 10+ chars
+  // More lenient: allow more typos based on word length
   let maxAllowedErrors: number;
-  if (avgLength <= 9) {
-    maxAllowedErrors = 1;
+  if (avgLength <= 4) {
+    maxAllowedErrors = 1; // Short words: 1 typo
+  } else if (avgLength <= 6) {
+    maxAllowedErrors = 2; // Medium words: 2 typos
+  } else if (avgLength <= 9) {
+    maxAllowedErrors = 3; // Longer words: 3 typos
   } else {
-    maxAllowedErrors = 2;
+    maxAllowedErrors = 4; // Very long words: 4 typos
   }
 
   return distance <= maxAllowedErrors;
@@ -511,6 +515,7 @@ function startGameWithExternalWords(room: Room): void {
   }
   const spyIds = shuffledPlayers.slice(0, spyCount).map((p) => p.id);
 
+  const questionsPerPlayer = room.gameSettings?.questionsPerPlayer || QUESTIONS_PER_PLAYER;
   room.players.forEach((player) => {
     if (spyIds.includes(player.id)) {
       player.role = "spy";
@@ -519,7 +524,7 @@ function startGameWithExternalWords(room: Room): void {
       player.role = "player";
       player.word = room.currentWord;
     }
-    player.questionsRemaining = QUESTIONS_PER_PLAYER;
+    player.questionsRemaining = questionsPerPlayer;
     player.doneWithQuestions = false;
   });
 
@@ -602,6 +607,7 @@ function selectCategoryAndStartWordReveal(room: Room): void {
     room.spyWord = getSimilarWord(room.selectedCategory, room.currentWord);
   }
 
+  const questionsPerPlayer = room.gameSettings?.questionsPerPlayer || QUESTIONS_PER_PLAYER;
   room.players.forEach((player) => {
     if (spyIds.includes(player.id)) {
       player.role = "spy";
@@ -615,7 +621,7 @@ function selectCategoryAndStartWordReveal(room: Room): void {
       player.word = room.currentWord;
     }
     // Reset question state for new round
-    player.questionsRemaining = QUESTIONS_PER_PLAYER;
+    player.questionsRemaining = questionsPerPlayer;
     player.doneWithQuestions = false;
   });
 
@@ -655,12 +661,14 @@ export function askQuestion(playerId: string, targetId: string, question: string
   });
 
   // Decrease player's remaining questions
-  player.questionsRemaining = (player.questionsRemaining || QUESTIONS_PER_PLAYER) - 1;
+  const questionsPerPlayer = room.gameSettings?.questionsPerPlayer || QUESTIONS_PER_PLAYER;
+  player.questionsRemaining = (player.questionsRemaining || questionsPerPlayer) - 1;
   room.questionsAsked++;
 
-  // Ensure the timer is set for the current turn
+  // Ensure the timer is set for the current turn using custom duration
   if (room.turnTimerEnd === undefined) {
-    room.turnTimerEnd = Date.now() + 60000; // 1 minute timer
+    const questionDuration = (room.gameSettings?.questionDuration || 60) * 1000;
+    room.turnTimerEnd = Date.now() + questionDuration;
   }
 
   return room;
@@ -1061,13 +1069,14 @@ export function nextRound(playerId: string): Room | undefined {
   room.currentTurnPlayerId = undefined;
   room.turnTimerEnd = undefined;
 
+  const questionsPerPlayer = room.gameSettings?.questionsPerPlayer || QUESTIONS_PER_PLAYER;
   room.players.forEach((p) => {
     p.role = undefined;
     p.word = undefined;
     p.hasVoted = false;
     p.votedFor = undefined;
     p.isEliminated = false;
-    p.questionsRemaining = QUESTIONS_PER_PLAYER;
+    p.questionsRemaining = questionsPerPlayer;
     p.doneWithQuestions = false;
   });
 
@@ -1087,10 +1096,11 @@ export function startQuestioningPhase(roomId: string): Room | undefined {
     room.turnQueue = [...room.players].sort(() => Math.random() - 0.5).map(p => p.id);
   }
 
-  // Set first player's turn
+  // Set first player's turn with custom duration from settings
+  const questionDuration = (room.gameSettings?.questionDuration || 60) * 1000;
   if (!room.currentTurnPlayerId && room.turnQueue.length > 0) {
     room.currentTurnPlayerId = room.turnQueue[0];
-    room.turnTimerEnd = Date.now() + 60000; // 60 seconds for asking
+    room.turnTimerEnd = Date.now() + questionDuration;
   }
 
   return room;
@@ -1111,7 +1121,9 @@ export function forceStartQuestioningPhase(roomId: string): Room | undefined {
   }
   room.currentTurnPlayerId = room.turnQueue[0];
   room.currentPlayerIndex = room.players.findIndex(p => p.id === room.turnQueue[0]);
-  room.turnTimerEnd = Date.now() + 60000; // 1 minute timer for first turn
+  // Use custom duration from settings
+  const questionDuration = (room.gameSettings?.questionDuration || 60) * 1000;
+  room.turnTimerEnd = Date.now() + questionDuration;
 
   return room;
 }

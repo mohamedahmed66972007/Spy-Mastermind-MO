@@ -16,3 +16,8 @@
 [x] 16. Fixed spy voting timer issue - Dec 6, 2024 - Added missing startSpyVotingTimer() calls to done_with_questions and end_turn handlers
 [x] 17. Fixed duplicate scoring issue - Dec 6, 2024 - Removed duplicate point awarding in processGuessValidation and processSystemGuessValidation. Now points for voting correctly on spy are only awarded once in processSpyVotes
 [x] 18. Re-migration completion - Dec 8, 2024 - npm install completed successfully, workflow restarted and running, app fully functional with screenshot verification showing homepage with Arabic text
+[x] 19. Fixed timer frozen at 85 issue - Dec 8, 2024 - Client now uses room.gameSettings.questionDuration instead of hardcoded 60 seconds
+[x] 20. Improved spelling correction - Dec 8, 2024 - Made more lenient for Arabic words, allowing more typos based on word length
+[x] 21. Fixed word distribution in camouflage mode - Dec 8, 2024 - Improved getSimilarWord to ensure fruits pair with fruits, vegetables with vegetables, countries from same region, and cars from same brand
+[x] 22. Fixed custom question count - Dec 8, 2024 - Now uses room.gameSettings.questionsPerPlayer instead of hardcoded QUESTIONS_PER_PLAYER=3
+[x] 23. Fixed progress bar - Dec 8, 2024 - Now uses actual questionDuration/answerDuration from room settings instead of hardcoded 60/30 seconds
