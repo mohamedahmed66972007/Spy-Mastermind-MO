@@ -189,47 +189,67 @@ function startPreVotingTransition(roomId: string): void {
   const TRANSITION_DURATION = 10000; // 10 seconds
   room.phaseStartTime = Date.now();
 
+  console.log(`startPreVotingTransition: Starting transition for room ${roomId}`);
+
+  let countdownInterval: NodeJS.Timeout;
+
   // Broadcast timer updates
   const broadcastTimer = () => {
     const currentRoom = getRoom(roomId);
     if (!currentRoom || currentRoom.phase !== "pre_voting_transition") {
+      if (countdownInterval) clearInterval(countdownInterval);
       return false;
     }
 
     const elapsed = Date.now() - (currentRoom.phaseStartTime || Date.now());
     const remaining = Math.max(0, Math.ceil((TRANSITION_DURATION - elapsed) / 1000));
 
+    console.log(`startPreVotingTransition: Broadcasting remaining=${remaining}s`);
+
     broadcastToRoom(roomId, {
       type: "timer_update",
       data: { timeRemaining: remaining },
     });
 
-    return remaining > 0;
+    if (remaining === 0) {
+      if (countdownInterval) clearInterval(countdownInterval);
+      return false;
+    }
+
+    return true;
   };
 
   // Initial broadcast
   broadcastTimer();
 
-  // Countdown interval
-  const countdownInterval = setInterval(() => {
-    const shouldContinue = broadcastTimer();
-    if (!shouldContinue) {
-      clearInterval(countdownInterval);
-    }
+  // Broadcast again after a short delay to ensure it's received
+  setTimeout(() => broadcastTimer(), 100);
+
+  // Countdown interval - broadcast every second
+  countdownInterval = setInterval(() => {
+    broadcastTimer();
   }, 1000);
 
   // Timer to move to spy voting
   const timer = setTimeout(() => {
-    clearInterval(countdownInterval);
+    console.log(`startPreVotingTransition: Timer expired, moving to spy_voting`);
+    if (countdownInterval) clearInterval(countdownInterval);
+    
     const currentRoom = getRoom(roomId);
     if (currentRoom && currentRoom.phase === "pre_voting_transition") {
       currentRoom.phase = "spy_voting";
       currentRoom.phaseStartTime = Date.now();
+      
+      console.log(`startPreVotingTransition: Phase changed to spy_voting`);
+      
       broadcastToRoom(roomId, {
         type: "phase_changed",
         data: { phase: "spy_voting", room: currentRoom },
       });
+      
       startSpyVotingTimer(roomId);
+    } else {
+      console.log(`startPreVotingTransition: Room phase already changed to ${currentRoom?.phase}`);
     }
     transitionTimers.delete(roomId);
   }, TRANSITION_DURATION);

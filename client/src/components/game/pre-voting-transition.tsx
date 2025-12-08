@@ -1,5 +1,5 @@
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState } from "react";
 import { Clock, Vote } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
@@ -9,48 +9,28 @@ const TRANSITION_DURATION = 10; // 10 seconds
 
 export function PreVotingTransition() {
   const { room, timerRemaining } = useGame();
-  const [localTimer, setLocalTimer] = useState(TRANSITION_DURATION);
-  const timerIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const [displayTimer, setDisplayTimer] = useState(TRANSITION_DURATION);
 
-  // Sync with server timer when it updates
+  // Use server timer directly
   useEffect(() => {
-    if (timerRemaining > 0 && timerRemaining <= TRANSITION_DURATION) {
-      console.log(`PreVotingTransition: Syncing timer from server: ${timerRemaining}s`);
-      setLocalTimer(timerRemaining);
+    if (timerRemaining >= 0 && timerRemaining <= TRANSITION_DURATION) {
+      console.log(`PreVotingTransition: Server timer update: ${timerRemaining}s`);
+      setDisplayTimer(timerRemaining);
     }
   }, [timerRemaining]);
 
-  // Initialize and start local countdown
+  // Initialize timer when phase starts
   useEffect(() => {
     if (room?.phase === "pre_voting_transition") {
-      console.log(`PreVotingTransition: Phase started, initializing timer`);
-      setLocalTimer(TRANSITION_DURATION);
-
-      // Clear any existing interval
-      if (timerIntervalRef.current) {
-        clearInterval(timerIntervalRef.current);
+      console.log(`PreVotingTransition: Phase started`);
+      // Wait for server timer
+      if (timerRemaining > 0) {
+        setDisplayTimer(timerRemaining);
+      } else {
+        setDisplayTimer(TRANSITION_DURATION);
       }
-
-      // Start local countdown
-      timerIntervalRef.current = setInterval(() => {
-        setLocalTimer((prev) => {
-          if (prev <= 0) return 0;
-          return prev - 1;
-        });
-      }, 1000);
     }
-
-    return () => {
-      if (timerIntervalRef.current) {
-        clearInterval(timerIntervalRef.current);
-      }
-    };
-  }, [room?.phase]);
-
-  // Use local timer, fall back to server timer if available
-  const displayTimer = timerRemaining > 0 && timerRemaining <= TRANSITION_DURATION 
-    ? timerRemaining 
-    : localTimer;
+  }, [room?.phase, timerRemaining]);
 
   if (!room) return null;
 

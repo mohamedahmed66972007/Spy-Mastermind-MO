@@ -690,15 +690,15 @@ export function answerQuestion(playerId: string, answer: string): { room: Room; 
   advanceToNextTurn(room);
   const turnAdvanced = room.currentTurnPlayerId !== previousTurnPlayerId || room.phase !== previousPhase;
 
-  // If the phase has changed to pre_voting_transition or spy_voting, reset the timer
+  // If the phase has changed to pre_voting_transition, set up the timer
   if (room.phase === "pre_voting_transition") {
     room.turnTimerEnd = undefined;
-    room.phaseStartTime = Date.now(); // Start timer for transition phase
-    console.log(`answerQuestion: Moved to pre_voting_transition, timer started`);
+    room.phaseStartTime = Date.now();
+    console.log(`answerQuestion: Moved to pre_voting_transition, phaseStartTime set to ${room.phaseStartTime}`);
   } else if (room.phase === "spy_voting") {
-    room.turnTimerEnd = undefined; // Reset timer for spy voting
-    room.phaseStartTime = Date.now(); // Start timer for spy voting phase
-    console.log(`answerQuestion: Moved to spy_voting, timer started`);
+    room.turnTimerEnd = undefined;
+    room.phaseStartTime = Date.now();
+    console.log(`answerQuestion: Moved to spy_voting, phaseStartTime set to ${room.phaseStartTime}`);
   }
 
   return { room, turnAdvanced };
