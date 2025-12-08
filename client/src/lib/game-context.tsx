@@ -206,6 +206,8 @@ export function GameProvider({ children }: { children: ReactNode }) {
       case "player_kicked":
         // If current player was kicked
         if (message.data.isYou || message.data.playerId === playerId) {
+          // Show immediate alert
+          alert("⚠️ تم طردك من الغرفة من قبل القائد");
           setError("تم طردك من الغرفة من قبل القائد");
           clearSession();
           setRoom(null);
