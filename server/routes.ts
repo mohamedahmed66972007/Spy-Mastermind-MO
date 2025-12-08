@@ -191,7 +191,7 @@ function startPreVotingTransition(roomId: string): void {
 
   console.log(`startPreVotingTransition: Starting transition for room ${roomId}`);
 
-  let countdownInterval: NodeJS.Timeout;
+  let countdownInterval: NodeJS.Timeout | undefined;
 
   // Broadcast timer updates
   const broadcastTimer = () => {
@@ -219,15 +219,18 @@ function startPreVotingTransition(roomId: string): void {
     return true;
   };
 
-  // Initial broadcast
+  // Initial broadcast - multiple times to ensure delivery
   broadcastTimer();
-
-  // Broadcast again after a short delay to ensure it's received
+  setTimeout(() => broadcastTimer(), 50);
   setTimeout(() => broadcastTimer(), 100);
+  setTimeout(() => broadcastTimer(), 200);
 
   // Countdown interval - broadcast every second
   countdownInterval = setInterval(() => {
-    broadcastTimer();
+    const shouldContinue = broadcastTimer();
+    if (!shouldContinue && countdownInterval) {
+      clearInterval(countdownInterval);
+    }
   }, 1000);
 
   // Timer to move to spy voting
