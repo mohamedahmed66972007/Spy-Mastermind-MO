@@ -690,10 +690,15 @@ export function answerQuestion(playerId: string, answer: string): { room: Room; 
   advanceToNextTurn(room);
   const turnAdvanced = room.currentTurnPlayerId !== previousTurnPlayerId || room.phase !== previousPhase;
 
-  // If the phase has changed to spy_voting, reset the timer
-  if ((room.phase as string) === "spy_voting") {
+  // If the phase has changed to pre_voting_transition or spy_voting, reset the timer
+  if (room.phase === "pre_voting_transition") {
+    room.turnTimerEnd = undefined;
+    room.phaseStartTime = Date.now(); // Start timer for transition phase
+    console.log(`answerQuestion: Moved to pre_voting_transition, timer started`);
+  } else if (room.phase === "spy_voting") {
     room.turnTimerEnd = undefined; // Reset timer for spy voting
     room.phaseStartTime = Date.now(); // Start timer for spy voting phase
+    console.log(`answerQuestion: Moved to spy_voting, timer started`);
   }
 
   return { room, turnAdvanced };
@@ -811,6 +816,7 @@ function advanceToNextTurn(room: Room): void {
     if (nextPlayer && !nextPlayer.doneWithQuestions && (nextPlayer.questionsRemaining ?? 0) > 0) {
       room.currentTurnPlayerId = nextPlayerId;
       room.turnTimerEnd = undefined; // Reset timer for new turn
+      console.log(`advanceToNextTurn: Next turn goes to ${nextPlayer.name}`);
       return;
     }
 
@@ -819,6 +825,7 @@ function advanceToNextTurn(room: Room): void {
   }
 
   // If we've looped through all players and no one can ask questions, move to transition phase
+  console.log(`advanceToNextTurn: All players done, moving to pre_voting_transition`);
   room.phase = "pre_voting_transition";
   room.currentTurnPlayerId = undefined;
   room.turnTimerEnd = undefined;

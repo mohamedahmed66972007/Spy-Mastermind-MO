@@ -1,5 +1,5 @@
 
-import { useEffect } from "react";
+import { useEffect, useState, useRef } from "react";
 import { Clock, Vote } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
@@ -9,6 +9,48 @@ const TRANSITION_DURATION = 10; // 10 seconds
 
 export function PreVotingTransition() {
   const { room, timerRemaining } = useGame();
+  const [localTimer, setLocalTimer] = useState(TRANSITION_DURATION);
+  const timerIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Sync with server timer when it updates
+  useEffect(() => {
+    if (timerRemaining > 0 && timerRemaining <= TRANSITION_DURATION) {
+      console.log(`PreVotingTransition: Syncing timer from server: ${timerRemaining}s`);
+      setLocalTimer(timerRemaining);
+    }
+  }, [timerRemaining]);
+
+  // Initialize and start local countdown
+  useEffect(() => {
+    if (room?.phase === "pre_voting_transition") {
+      console.log(`PreVotingTransition: Phase started, initializing timer`);
+      setLocalTimer(TRANSITION_DURATION);
+
+      // Clear any existing interval
+      if (timerIntervalRef.current) {
+        clearInterval(timerIntervalRef.current);
+      }
+
+      // Start local countdown
+      timerIntervalRef.current = setInterval(() => {
+        setLocalTimer((prev) => {
+          if (prev <= 0) return 0;
+          return prev - 1;
+        });
+      }, 1000);
+    }
+
+    return () => {
+      if (timerIntervalRef.current) {
+        clearInterval(timerIntervalRef.current);
+      }
+    };
+  }, [room?.phase]);
+
+  // Use local timer, fall back to server timer if available
+  const displayTimer = timerRemaining > 0 && timerRemaining <= TRANSITION_DURATION 
+    ? timerRemaining 
+    : localTimer;
 
   if (!room) return null;
 
@@ -30,11 +72,11 @@ export function PreVotingTransition() {
           <div className="flex items-center justify-center gap-2 mb-3">
             <Vote className="w-6 h-6 text-primary animate-pulse" />
             <span className="text-3xl font-bold tabular-nums text-primary">
-              {timerRemaining}
+              {displayTimer}
             </span>
           </div>
           <Progress 
-            value={(timerRemaining / TRANSITION_DURATION) * 100} 
+            value={(displayTimer / TRANSITION_DURATION) * 100} 
             className="h-3 w-64 mx-auto"
           />
         </div>

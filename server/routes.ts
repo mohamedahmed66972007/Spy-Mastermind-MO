@@ -942,7 +942,7 @@ function handleMessage(ws: WebSocket, data: string): void {
             type: "phase_changed",
             data: { phase: "word_reveal", room },
           });
-          // Always start word reveal timer to transition to questioning
+          // Start word reveal timer to transition to questioning
           startWordRevealTimer(room.id);
         }
       }
@@ -1000,34 +1000,41 @@ function handleMessage(ws: WebSocket, data: string): void {
 
     case "answer_question": {
       if (!playerId) return;
+      const room = getRoomByPlayerId(playerId);
+      if (!room) return; // Should not happen if playerId is valid
+
       const result = answerQuestion(playerId, message.data.answer);
       if (result) {
-        const { room, turnAdvanced } = result;
-        // Clear answer timer since answer was given
-        clearAnswerTimer(room.id);
-
         broadcastToRoom(room.id, {
           type: "room_updated",
-          data: { room },
+          data: { room: result.room },
         });
 
-        // If turn advanced after answering, handle timer and turn change
-        if (turnAdvanced) {
-          if (room.phase === "spy_voting") {
-            clearTurnTimer(room.id);
-            broadcastToRoom(room.id, {
-              type: "phase_changed",
-              data: { phase: "spy_voting", room },
-            });
-            startSpyVotingTimer(room.id);
-          } else if (room.phase === "questioning" && room.currentTurnPlayerId) {
-            // Turn changed, restart timer for next player (60 seconds for asking)
-            startTurnTimer(room.id, true);
-            broadcastToRoom(room.id, {
-              type: "turn_changed",
-              data: { currentPlayerId: room.currentTurnPlayerId, room },
-            });
-          }
+        // Check if phase changed to pre_voting_transition
+        if (result.room.phase === "pre_voting_transition") {
+          console.log(`answer_question: Phase changed to pre_voting_transition, starting transition timer`);
+          clearAnswerTimer(room.id);
+          clearTurnTimer(room.id);
+          broadcastToRoom(room.id, {
+            type: "phase_changed",
+            data: { phase: "pre_voting_transition", room: result.room },
+          });
+          startPreVotingTransition(room.id);
+        } else if (result.turnAdvanced && result.room.currentTurnPlayerId) {
+          // If turn advanced to a new player, notify about the turn change
+          broadcastToRoom(room.id, {
+            type: "turn_changed",
+            data: { currentPlayerId: result.room.currentTurnPlayerId, room: result.room },
+          });
+
+          // Clear previous answer timer
+          clearAnswerTimer(room.id);
+
+          // Start new turn timer (for asking)
+          startTurnTimer(room.id, true);
+        } else {
+          // Clear answer timer since question was answered
+          clearAnswerTimer(room.id);
         }
       }
       break;
