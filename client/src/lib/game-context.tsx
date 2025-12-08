@@ -206,16 +206,29 @@ export function GameProvider({ children }: { children: ReactNode }) {
       case "player_kicked":
         // If current player was kicked
         if (message.data.isYou || message.data.playerId === playerId) {
-          // Show immediate alert
-          alert("⚠️ تم طردك من الغرفة من قبل القائد");
-          setError("تم طردك من الغرفة من قبل القائد");
+          // Clear session first to prevent reconnection attempts
           clearSession();
+          
+          // Mark socket as null to prevent reconnection
+          socketRef.current = null;
+          
+          // Close the actual connection
+          if (socket) {
+            socket.close(1000, "Kicked from room");
+          }
+          
+          // Clear all state
           setRoom(null);
           setPlayerId(null);
-          // Close connection
-          if (socketRef.current) {
-            socketRef.current.close(1000, "Kicked from room");
-          }
+          setIsConnected(false);
+          
+          // Show immediate alert
+          setTimeout(() => {
+            alert("⚠️ تم طردك من الغرفة من قبل القائد");
+          }, 100);
+          
+          // Set error message
+          setError("تم طردك من الغرفة من قبل القائد");
         } else {
           // Another player was kicked
           setRoom(message.data.room);

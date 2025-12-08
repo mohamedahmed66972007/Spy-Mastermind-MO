@@ -1144,9 +1144,9 @@ function handleMessage(ws: WebSocket, data: string): void {
         const { room, kickedPlayerName } = result;
         const kickedClient = clients.get(message.data.playerId);
         
-        // Notify kicked player
+        // Notify kicked player - send message multiple times to ensure delivery
         if (kickedClient && kickedClient.readyState === WebSocket.OPEN) {
-          kickedClient.send(JSON.stringify({
+          const kickMessage = JSON.stringify({
             type: "player_kicked",
             data: { 
               playerId: message.data.playerId, 
@@ -1154,16 +1154,30 @@ function handleMessage(ws: WebSocket, data: string): void {
               room,
               isYou: true
             },
-          }));
-          // Wait a bit before closing to ensure message is delivered
+          });
+          
+          // Send the message immediately
+          kickedClient.send(kickMessage);
+          
+          // Send again after a short delay to ensure delivery
           setTimeout(() => {
             if (kickedClient.readyState === WebSocket.OPEN) {
-              kickedClient.close();
+              kickedClient.send(kickMessage);
             }
-          }, 500);
+          }, 100);
+          
+          // Wait longer before closing to ensure message is delivered
+          setTimeout(() => {
+            if (kickedClient.readyState === WebSocket.OPEN) {
+              kickedClient.close(1000, "Kicked from room");
+            }
+          }, 1000);
         }
         
-        clients.delete(message.data.playerId);
+        // Delete from clients after a delay
+        setTimeout(() => {
+          clients.delete(message.data.playerId);
+        }, 1000);
         
         // Notify remaining players
         broadcastToRoom(room.id, {
