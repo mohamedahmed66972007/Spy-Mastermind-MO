@@ -1,5 +1,6 @@
 import { createContext, useContext, useCallback, useEffect, useState, useRef, type ReactNode } from "react";
 import type { Room, Player, ServerMessage, WebSocketMessage, GameMode, Message, GuessValidationMode, WordSourceMode, GameSettings } from "@shared/schema";
+import { toast } from "@/hooks/use-toast";
 
 const SESSION_STORAGE_KEY = "spy_mastermind_session";
 
@@ -206,6 +207,13 @@ export function GameProvider({ children }: { children: ReactNode }) {
       case "player_kicked":
         // If current player was kicked
         if (message.data.isYou || message.data.playerId === playerId) {
+          // Show toast notification
+          toast({
+            title: "⚠️ تم طردك من الغرفة",
+            description: "تم طردك من الغرفة من قبل القائد",
+            variant: "destructive",
+          });
+          
           // Clear session first to prevent reconnection attempts
           clearSession();
           
@@ -222,13 +230,10 @@ export function GameProvider({ children }: { children: ReactNode }) {
           setPlayerId(null);
           setIsConnected(false);
           
-          // Show immediate alert
+          // Redirect to home page after showing toast
           setTimeout(() => {
-            alert("⚠️ تم طردك من الغرفة من قبل القائد");
-          }, 100);
-          
-          // Set error message
-          setError("تم طردك من الغرفة من قبل القائد");
+            window.location.href = "/";
+          }, 1500);
         } else {
           // Another player was kicked
           setRoom(message.data.room);
