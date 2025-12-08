@@ -34,6 +34,8 @@ import {
   forceEndAskingPhase,
   forceEndAnsweringPhase,
   updateGameSettings,
+  transferHost,
+  kickPlayer,
 } from "./game-storage";
 
 const clients = new Map<string, WebSocket>();
