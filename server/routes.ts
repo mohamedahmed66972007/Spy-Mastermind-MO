@@ -150,6 +150,7 @@ const answerTimers = new Map<string, NodeJS.Timeout>();
 const answerIntervals = new Map<string, NodeJS.Timeout>();
 const votingTimers = new Map<string, NodeJS.Timeout>();
 const transitionTimers = new Map<string, NodeJS.Timeout>();
+const transitionIntervals = new Map<string, NodeJS.Timeout>();
 
 function clearTurnTimer(roomId: string): void {
   const timer = turnTimers.get(roomId);
@@ -178,6 +179,11 @@ function clearTransitionTimer(roomId: string): void {
     clearTimeout(timer);
     transitionTimers.delete(roomId);
   }
+  const interval = transitionIntervals.get(roomId);
+  if (interval) {
+    clearInterval(interval);
+    transitionIntervals.delete(roomId);
+  }
 }
 
 function startPreVotingTransition(roomId: string): void {
@@ -194,14 +200,14 @@ function startPreVotingTransition(roomId: string): void {
 
   console.log(`startPreVotingTransition: Starting transition for room ${roomId}`);
 
-  let countdownInterval: NodeJS.Timeout | undefined;
-
   // Broadcast timer updates
   const broadcastTimer = () => {
     const currentRoom = getRoom(roomId);
     if (!currentRoom || currentRoom.phase !== "pre_voting_transition") {
-      if (countdownInterval) {
-        clearInterval(countdownInterval);
+      const existingInterval = transitionIntervals.get(roomId);
+      if (existingInterval) {
+        clearInterval(existingInterval);
+        transitionIntervals.delete(roomId);
       }
       return false;
     }
@@ -224,20 +230,30 @@ function startPreVotingTransition(roomId: string): void {
   setTimeout(() => broadcastTimer(), 100);
   setTimeout(() => broadcastTimer(), 500);
 
-  // Countdown interval - broadcast every second
-  countdownInterval = setInterval(() => {
+  // Countdown interval - broadcast every second (stored in Map)
+  const countdownInterval = setInterval(() => {
     const shouldContinue = broadcastTimer();
-    if (!shouldContinue && countdownInterval) {
-      clearInterval(countdownInterval);
+    if (!shouldContinue) {
+      const existingInterval = transitionIntervals.get(roomId);
+      if (existingInterval) {
+        clearInterval(existingInterval);
+        transitionIntervals.delete(roomId);
+      }
     }
   }, 1000);
+  
+  // Store the interval in the Map
+  transitionIntervals.set(roomId, countdownInterval);
 
   // Timer to move to spy voting
   const timer = setTimeout(() => {
     console.log(`startPreVotingTransition: Timer expired, moving to spy_voting`);
     
-    if (countdownInterval) {
-      clearInterval(countdownInterval);
+    // Clear the countdown interval
+    const existingInterval = transitionIntervals.get(roomId);
+    if (existingInterval) {
+      clearInterval(existingInterval);
+      transitionIntervals.delete(roomId);
     }
     
     const currentRoom = getRoom(roomId);

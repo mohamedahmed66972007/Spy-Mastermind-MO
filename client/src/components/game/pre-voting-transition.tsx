@@ -1,6 +1,6 @@
 
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState } from "react";
 import { Clock, Vote } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
@@ -10,61 +10,15 @@ const TRANSITION_DURATION = 10; // 10 seconds
 
 export function PreVotingTransition() {
   const { room, timerRemaining } = useGame();
-  const [localTimer, setLocalTimer] = useState(TRANSITION_DURATION);
-  const intervalRef = useRef<NodeJS.Timeout | null>(null);
-  const hasStartedRef = useRef(false);
+  const [displayTimer, setDisplayTimer] = useState(TRANSITION_DURATION);
 
-  // Sync with server timer when available
+  // Update display timer whenever server timer changes
   useEffect(() => {
     if (room?.phase === "pre_voting_transition" && timerRemaining > 0) {
       console.log(`PreVotingTransition: Server timer update: ${timerRemaining}s`);
-      setLocalTimer(timerRemaining);
+      setDisplayTimer(timerRemaining);
     }
   }, [timerRemaining, room?.phase]);
-
-  // Local countdown timer that runs independently
-  useEffect(() => {
-    if (room?.phase === "pre_voting_transition" && !hasStartedRef.current) {
-      hasStartedRef.current = true;
-      console.log(`PreVotingTransition: Starting local countdown from ${TRANSITION_DURATION}s`);
-      
-      // Clear any existing interval
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current);
-      }
-      
-      // Start countdown
-      intervalRef.current = setInterval(() => {
-        setLocalTimer((prev) => {
-          const next = prev - 1;
-          console.log(`PreVotingTransition: Local timer: ${next}s`);
-          if (next <= 0) {
-            if (intervalRef.current) {
-              clearInterval(intervalRef.current);
-              intervalRef.current = null;
-            }
-            return 0;
-          }
-          return next;
-        });
-      }, 1000);
-    }
-
-    // Cleanup on unmount or phase change
-    return () => {
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current);
-        intervalRef.current = null;
-      }
-      // Reset for next time
-      if (room?.phase !== "pre_voting_transition") {
-        hasStartedRef.current = false;
-      }
-    };
-  }, [room?.phase]);
-
-  // Use the larger of local timer or server timer (in case server is ahead)
-  const displayTimer = timerRemaining > 0 ? Math.min(timerRemaining, localTimer) : localTimer;
 
   if (!room) return null;
 

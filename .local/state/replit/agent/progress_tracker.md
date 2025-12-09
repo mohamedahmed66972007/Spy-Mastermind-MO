@@ -22,4 +22,5 @@
 [x] 22. Fixed custom question count - Dec 8, 2024 - Now uses room.gameSettings.questionsPerPlayer instead of hardcoded QUESTIONS_PER_PLAYER=3
 [x] 23. Fixed progress bar - Dec 8, 2024 - Now uses actual questionDuration/answerDuration from room settings instead of hardcoded 60/30 seconds
 [x] 24. Re-migration completion - Dec 9, 2024 - npm install completed successfully, workflow restarted and running, app fully functional with screenshot verification
-[x] 25. Fixed pre-voting transition timer - Dec 9, 2024 - Added local countdown timer to PreVotingTransition component that runs independently from server updates. Now the 10-second countdown works properly and transitions to voting phase.
+[x] 25. Fixed pre-voting transition timer - Dec 9, 2024 - Fixed server-side timer by storing countdown interval in transitionIntervals Map (was stored in local variable causing garbage collection). Now timer updates broadcast properly to all clients and transition happens synchronously for all players after 10 seconds.
+[x] 26. Added read-only settings view for non-host players - Dec 9, 2024 - Non-host players can now see all game settings (spy count, question duration, answer duration, voting duration, guess duration, validation mode) in a read-only grid format with "للقراءة فقط" badge.

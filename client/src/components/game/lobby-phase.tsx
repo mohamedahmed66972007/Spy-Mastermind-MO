@@ -252,7 +252,7 @@ export function LobbyPhase() {
         </CardContent>
       </Card>
 
-      {isHost && (
+      {isHost ? (
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="flex items-center gap-2">
@@ -506,6 +506,59 @@ export function LobbyPhase() {
                   )}
                 </div>
               </>
+            )}
+          </CardContent>
+        </Card>
+      ) : (
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2">
+              <Settings className="w-5 h-5 text-primary" />
+              إعدادات اللعبة
+              <Badge variant="secondary" className="text-xs">للقراءة فقط</Badge>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="p-3 rounded-lg bg-muted/50">
+                <p className="text-sm text-muted-foreground">عدد الجواسيس</p>
+                <p className="font-bold text-lg">{room.spyCount}</p>
+              </div>
+              <div className="p-3 rounded-lg bg-muted/50">
+                <p className="text-sm text-muted-foreground">أسئلة لكل لاعب</p>
+                <p className="font-bold text-lg">{room.gameSettings?.questionsPerPlayer || 3}</p>
+              </div>
+              <div className="p-3 rounded-lg bg-muted/50">
+                <p className="text-sm text-muted-foreground">مدة السؤال</p>
+                <p className="font-bold text-lg">{room.gameSettings?.questionDuration || 60} ثانية</p>
+              </div>
+              <div className="p-3 rounded-lg bg-muted/50">
+                <p className="text-sm text-muted-foreground">مدة الإجابة</p>
+                <p className="font-bold text-lg">{room.gameSettings?.answerDuration || 30} ثانية</p>
+              </div>
+              <div className="p-3 rounded-lg bg-muted/50">
+                <p className="text-sm text-muted-foreground">مدة التصويت</p>
+                <p className="font-bold text-lg">{room.gameSettings?.spyVotingDuration || 30} ثانية</p>
+              </div>
+              <div className="p-3 rounded-lg bg-muted/50">
+                <p className="text-sm text-muted-foreground">مدة تخمين الجاسوس</p>
+                <p className="font-bold text-lg">{room.gameSettings?.spyGuessDuration || 30} ثانية</p>
+              </div>
+            </div>
+            <Separator />
+            <div className="flex items-center justify-between gap-4">
+              <p className="text-sm text-muted-foreground">التحقق من التخمين</p>
+              <Badge variant={room.guessValidationMode === "system" ? "default" : "secondary"}>
+                {room.guessValidationMode === "system" ? "تلقائي" : "يدوي"}
+              </Badge>
+            </div>
+            {room.gameMode === "blind" && (
+              <div className="flex items-center justify-between gap-4">
+                <p className="text-sm text-muted-foreground">مصدر الكلمات</p>
+                <Badge variant={room.wordSource === "system" ? "default" : "secondary"}>
+                  {room.wordSource === "system" ? "النظام" : "خارجي"}
+                </Badge>
+              </div>
             )}
           </CardContent>
         </Card>
