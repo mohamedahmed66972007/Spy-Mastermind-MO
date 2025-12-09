@@ -1,27 +1,26 @@
-
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" fill="none">
-  <!-- خلفية سوداء -->
+  <!-- الخلفية -->
   <rect width="200" height="200" fill="#362f2fff" rx="20"/>
   
-  <!-- القبعة باللون الأخضر -->
-  <ellipse cx="100" cy="60" rx="70" ry="12" fill="#10b981"/>
-  <path d="M 40 60 L 35 35 L 165 35 L 160 60 Z" fill="#059669"/>
-  <rect x="70" y="10" width="60" height="40" rx="5" fill="#059669"/>
+  <!-- القبعة (منزّلة 30 وحدة) -->
+  <ellipse cx="100" cy="90" rx="70" ry="12" fill="#10b981"/>
+  <path d="M 40 90 L 35 65 L 165 65 L 160 90 Z" fill="#059669"/>
+  <rect x="70" y="40" width="60" height="40" rx="5" fill="#059669"/>
   
   <!-- حافة القبعة السفلية -->
-  <rect x="30" y="58" width="140" height="4" rx="2" fill="#10b981"/>
+  <rect x="30" y="88" width="140" height="4" rx="2" fill="#10b981"/>
   
-  <!-- النظارة باللون الأخضر -->
+  <!-- النظارة (منزّلة 30 وحدة) -->
   <!-- الإطار الأيسر -->
-  <circle cx="75" cy="120" r="22" fill="none" stroke="#10b981" stroke-width="5"/>
+  <circle cx="75" cy="150" r="22" fill="none" stroke="#10b981" stroke-width="5"/>
   
   <!-- الإطار الأيمن -->
-  <circle cx="125" cy="120" r="22" fill="none" stroke="#10b981" stroke-width="5"/>
+  <circle cx="125" cy="150" r="22" fill="none" stroke="#10b981" stroke-width="5"/>
   
-  <!-- جسر النظارة -->
-  <line x1="97" y1="120" x2="103" y2="120" stroke="#10b981" stroke-width="5" stroke-linecap="round"/>
+  <!-- الجسر -->
+  <line x1="97" y1="150" x2="103" y2="150" stroke="#10b981" stroke-width="5" stroke-linecap="round"/>
   
-  <!-- أذرع النظارة -->
-  <line x1="53" y1="120" x2="40" y2="115" stroke="#10b981" stroke-width="4" stroke-linecap="round"/>
-  <line x1="147" y1="120" x2="160" y2="115" stroke="#10b981" stroke-width="4" stroke-linecap="round"/>
+  <!-- الأذرع -->
+  <line x1="53" y1="150" x2="40" y2="145" stroke="#10b981" stroke-width="4" stroke-linecap="round"/>
+  <line x1="147" y1="150" x2="160" y2="145" stroke="#10b981" stroke-width="4" stroke-linecap="round"/>
 </svg>
