@@ -24,3 +24,4 @@
 [x] 24. Re-migration completion - Dec 9, 2024 - npm install completed successfully, workflow restarted and running, app fully functional with screenshot verification
 [x] 25. Fixed pre-voting transition timer - Dec 9, 2024 - Fixed server-side timer by storing countdown interval in transitionIntervals Map (was stored in local variable causing garbage collection). Now timer updates broadcast properly to all clients and transition happens synchronously for all players after 10 seconds.
 [x] 26. Added read-only settings view for non-host players - Dec 9, 2024 - Non-host players can now see all game settings (spy count, question duration, answer duration, voting duration, guess duration, validation mode) in a read-only grid format with "للقراءة فقط" badge.
+[x] 27. Re-migration completion - Dec 9, 2024 - npm install completed successfully, workflow restarted and running, app fully functional with screenshot verification showing Arabic homepage
