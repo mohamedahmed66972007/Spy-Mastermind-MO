@@ -117,7 +117,17 @@ export default function Home() {
     <div className="min-h-screen bg-background flex flex-col">
       <header className="w-full p-4 flex justify-between items-center gap-4">
         <div className="flex items-center gap-2">
-          <Search className="w-6 h-6 text-primary" />
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" fill="none" className="w-6 h-6">
+            <ellipse cx="100" cy="60" rx="70" ry="12" fill="currentColor" className="text-primary"/>
+            <path d="M 40 60 L 35 35 L 165 35 L 160 60 Z" fill="currentColor" className="text-primary"/>
+            <rect x="70" y="10" width="60" height="40" rx="5" fill="currentColor" className="text-primary"/>
+            <rect x="30" y="58" width="140" height="4" rx="2" fill="currentColor" className="text-primary"/>
+            <circle cx="75" cy="120" r="22" fill="none" stroke="currentColor" stroke-width="5" className="text-primary"/>
+            <circle cx="125" cy="120" r="22" fill="none" stroke="currentColor" stroke-width="5" className="text-primary"/>
+            <line x1="97" y1="120" x2="103" y2="120" stroke="currentColor" stroke-width="5" stroke-linecap="round" className="text-primary"/>
+            <line x1="53" y1="120" x2="40" y2="115" stroke="currentColor" stroke-width="4" stroke-linecap="round" className="text-primary"/>
+            <line x1="147" y1="120" x2="160" y2="115" stroke="currentColor" stroke-width="4" stroke-linecap="round" className="text-primary"/>
+          </svg>
           <span className="text-lg font-bold text-foreground">من هو الجاسوس؟</span>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
@@ -158,11 +168,18 @@ export default function Home() {
 
       <main className="flex-1 flex flex-col items-center justify-center p-4 gap-8">
         <div className="text-center space-y-4 animate-fade-in">
-          <div className="relative inline-block">
-            <Search className="w-20 h-20 md:w-28 md:h-28 text-primary mx-auto" />
-            <div className="absolute -top-2 -right-2 w-8 h-8 bg-spy rounded-full flex items-center justify-center">
-              <span className="text-spy-foreground text-xs font-bold">؟</span>
-            </div>
+          <div className="w-20 h-20 md:w-28 md:h-28 mx-auto">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" fill="none" className="w-full h-full">
+              <ellipse cx="100" cy="60" rx="70" ry="12" fill="currentColor" className="text-primary"/>
+              <path d="M 40 60 L 35 35 L 165 35 L 160 60 Z" fill="currentColor" className="text-primary"/>
+              <rect x="70" y="10" width="60" height="40" rx="5" fill="currentColor" className="text-primary"/>
+              <rect x="30" y="58" width="140" height="4" rx="2" fill="currentColor" className="text-primary"/>
+              <circle cx="75" cy="120" r="22" fill="none" stroke="currentColor" stroke-width="5" className="text-primary"/>
+              <circle cx="125" cy="120" r="22" fill="none" stroke="currentColor" stroke-width="5" className="text-primary"/>
+              <line x1="97" y1="120" x2="103" y2="120" stroke="currentColor" stroke-width="5" stroke-linecap="round" className="text-primary"/>
+              <line x1="53" y1="120" x2="40" y2="115" stroke="currentColor" stroke-width="4" stroke-linecap="round" className="text-primary"/>
+              <line x1="147" y1="120" x2="160" y2="115" stroke="currentColor" stroke-width="4" stroke-linecap="round" className="text-primary"/>
+            </svg>
           </div>
           <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-foreground">
             من هو الجاسوس؟
