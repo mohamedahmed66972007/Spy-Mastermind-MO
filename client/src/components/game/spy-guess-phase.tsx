@@ -12,7 +12,10 @@ import { playTimerWarningSound } from "@/lib/sounds";
 export function SpyGuessPhase() {
   const { room, currentPlayer, playerId, submitGuess, timerRemaining } = useGame();
   const [guess, setGuess] = useState("");
-  const [localTimer, setLocalTimer] = useState(timerRemaining || 30);
+  
+  // Use spy guess duration from room settings
+  const guessDuration = room?.gameSettings?.spyGuessDuration || 30;
+  const [localTimer, setLocalTimer] = useState(timerRemaining || guessDuration);
   const playedWarning = useRef(false);
   const timerIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -33,7 +36,7 @@ export function SpyGuessPhase() {
     if (room?.phase !== "spy_guess") return;
 
     timerIntervalRef.current = setInterval(() => {
-      setLocalTimer((prev) => {
+      setLocalTimer((prev: number) => {
         if (prev <= 0) return 0;
         const newVal = prev - 1;
         if (newVal === 10 && !playedWarning.current) {
@@ -93,7 +96,7 @@ export function SpyGuessPhase() {
                 {localTimer}
               </span>
             </div>
-            <Progress value={(localTimer / 30) * 100} className="h-2 w-48 mx-auto" />
+            <Progress value={(localTimer / guessDuration) * 100} className="h-2 w-48 mx-auto" />
           </div>
         )}
         

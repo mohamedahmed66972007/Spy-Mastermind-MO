@@ -8,14 +8,15 @@ import { Progress } from "@/components/ui/progress";
 import { useGame } from "@/lib/game-context";
 import { playVoteSound, resumeAudioContext, playTimerWarningSound } from "@/lib/sounds";
 
-const SPY_VOTING_DURATION = 30; // 30 seconds
-
 export function SpyVotingPhase() {
   const { room, currentPlayer, playerId, voteSpy, timerRemaining } = useGame();
   const [selectedSuspect, setSelectedSuspect] = useState<string | null>(null);
   const playedWarning = useRef(false);
   const [votingEnded, setVotingEnded] = useState(false);
-  const [localTimer, setLocalTimer] = useState(SPY_VOTING_DURATION);
+  
+  // Use spy voting duration from room settings
+  const votingDuration = room?.gameSettings?.spyVotingDuration || 30;
+  const [localTimer, setLocalTimer] = useState(votingDuration);
   const timerIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   // Sync local timer with server timer when it updates
@@ -29,8 +30,8 @@ export function SpyVotingPhase() {
   // Initialize timer when phase starts
   useEffect(() => {
     if (room?.phase === "spy_voting") {
-      console.log(`SpyVotingPhase: Phase started, initializing timer`);
-      setLocalTimer(SPY_VOTING_DURATION);
+      console.log(`SpyVotingPhase: Phase started, initializing timer to ${votingDuration}s`);
+      setLocalTimer(votingDuration);
       setVotingEnded(false);
       playedWarning.current = false;
 
@@ -40,7 +41,7 @@ export function SpyVotingPhase() {
       }
 
       timerIntervalRef.current = setInterval(() => {
-        setLocalTimer((prev) => {
+        setLocalTimer((prev: number) => {
           if (prev <= 0) return 0;
           return prev - 1;
         });
@@ -136,7 +137,7 @@ export function SpyVotingPhase() {
               {Math.floor(displayTimer / 60)}:{(displayTimer % 60).toString().padStart(2, '0')}
             </span>
           </div>
-          <Progress value={(displayTimer / SPY_VOTING_DURATION) * 100} className="h-2 w-48 mx-auto" />
+          <Progress value={(displayTimer / votingDuration) * 100} className="h-2 w-48 mx-auto" />
           {votingEnded && !hasVoted && (
             <p className="text-destructive text-sm mt-2 animate-pulse">انتهى وقت التصويت</p>
           )}
