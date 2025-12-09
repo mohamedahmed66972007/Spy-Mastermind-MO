@@ -1017,7 +1017,15 @@ function handleMessage(ws: WebSocket, data: string): void {
           type: "room_updated",
           data: { room },
         });
-        if (prevPhase === "questioning" && room.phase === "spy_voting") {
+        if (prevPhase === "questioning" && room.phase === "pre_voting_transition") {
+          console.log(`done_with_questions: Phase changed to pre_voting_transition, starting transition timer`);
+          clearTurnTimer(room.id);
+          broadcastToRoom(room.id, {
+            type: "phase_changed",
+            data: { phase: "pre_voting_transition", room },
+          });
+          startPreVotingTransition(room.id);
+        } else if (prevPhase === "questioning" && room.phase === "spy_voting") {
           clearTurnTimer(room.id);
           broadcastToRoom(room.id, {
             type: "phase_changed",
@@ -1102,7 +1110,15 @@ function handleMessage(ws: WebSocket, data: string): void {
           type: "room_updated",
           data: { room },
         });
-        if (prevPhase === "questioning" && room.phase === "spy_voting") {
+        if (prevPhase === "questioning" && room.phase === "pre_voting_transition") {
+          console.log(`end_turn: Phase changed to pre_voting_transition, starting transition timer`);
+          clearTurnTimer(room.id);
+          broadcastToRoom(room.id, {
+            type: "phase_changed",
+            data: { phase: "pre_voting_transition", room },
+          });
+          startPreVotingTransition(room.id);
+        } else if (prevPhase === "questioning" && room.phase === "spy_voting") {
           clearTurnTimer(room.id);
           broadcastToRoom(room.id, {
             type: "phase_changed",
