@@ -191,9 +191,16 @@ export function GameProvider({ children }: { children: ReactNode }) {
         break;
       case "room_updated":
       case "game_started":
-      case "phase_changed":
       case "turn_changed":
         setRoom(message.data.room);
+        break;
+      case "phase_changed":
+        setRoom(message.data.room);
+        // Reset timer to 10 when entering pre_voting_transition phase
+        if (message.data.phase === "pre_voting_transition") {
+          console.log("Phase changed to pre_voting_transition, resetting timer to 10");
+          setTimerRemaining(10);
+        }
         break;
       case "spy_revealed":
         setRoom(message.data.room);
