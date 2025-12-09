@@ -153,7 +153,7 @@ export default function Home() {
             data-testid="button-number-game"
           >
             <Hash className="w-4 h-4" />
-            لعبة تخمين الأرقام
+            تخمين الأرقام
           </Button>
           <Button
             size="icon"
