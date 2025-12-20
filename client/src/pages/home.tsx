@@ -149,7 +149,7 @@ export default function Home() {
             variant="outline"
             size="sm"
             className="gap-2"
-            onClick={() => window.open("https://game-mo2025-v3.onrender.com", "_blank")}
+            onClick={() => window.open("https://game-mo2025-v3-new1.onrender.com", "_blank")}
             data-testid="button-number-game"
           >
             <Hash className="w-4 h-4" />
